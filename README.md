@@ -28,3 +28,5 @@ On iPhone or iPad, open the site in Safari and tap **Share → Add to Home Scree
 ## Develop
 
 Serve `public` with a local web server such as `python3 -m http.server 8000 --directory public`. Run the engine checks with `node --test`.
+
+Card sounds are adapted from [Casino Audio 1.1 by Kenney](https://kenney.nl/assets/casino-audio), released under [CC0 1.0](public/assets/audio/LICENSE.txt).

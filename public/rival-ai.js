@@ -6,9 +6,9 @@ const PACE = {
   expert: { look: 445, reach: 155, scanLimit: 7, slip: .72 },
 };
 const REACTIONS = [
-  ['Mist!', 'Mensch!', 'Ach, komm!'],
-  ['Verdammt!', 'So ein Mist!', 'Mann, schon wieder!'],
-  ['Scheiße!', 'Verdammter Mist!', 'Das gibt’s doch nicht!'],
+  ['Come on!', 'Oh, man!', 'So close!'],
+  ['Damn it!', 'Give me a break!', 'Not again!'],
+  ['Shit!', 'Goddammit!', 'I had that!'],
 ];
 
 const sample = (items, random) => items[Math.floor(random() * items.length)];
@@ -28,17 +28,17 @@ function addStress(rival, delta, now) {
   rival.stress = Math.min(100, Math.max(0, before + delta));
   const level = rival.stress;
   const crossed = [29, 54, 79].some(mark => before < mark && level >= mark);
-  if (delta <= 0 || level < 29 || now - rival.spokeAt < 6500 || (!crossed && delta < 4)) return;
+  if (delta <= 0 || level < 29 || now - rival.spokeAt < 6500 || (!crossed && delta < 2.2)) return;
   const tier = level >= 79 ? 2 : level >= 54 ? 1 : 0;
-  rival.speech = { text: sample(REACTIONS[tier], rival.random), until: now + 1550 };
+  rival.speech = { text: sample(REACTIONS[tier], rival.random), until: now + 1900 };
   rival.spokeAt = now;
 }
 
 function updateStress(rival, now) {
   if (now <= rival.stressAt) return;
   const idle = now - rival.lastBlitz;
-  const delta = (now - Math.max(rival.stressAt, rival.lastBlitz + 9000)) / 1000;
-  if (delta > 0) addStress(rival, delta * (idle >= 26000 ? .95 : .5), now);
+  const delta = (now - Math.max(rival.stressAt, rival.lastBlitz + 13000)) / 1000;
+  if (delta > 0) addStress(rival, delta * (idle >= 38000 ? .56 : .28), now);
   rival.stressAt = now;
   if (rival.speech && rival.speech.until <= now) rival.speech = null;
 }
@@ -49,14 +49,14 @@ export function noticePileChange(rival, pile, actor, now) {
   if (actor === rival.player || focus?.pile !== pile || focus.contested) return;
   if (focus.kind === 'play' || (focus.kind === 'pile' && focus.favored)) {
     focus.contested = true;
-    addStress(rival, focus.kind === 'play' ? 7.5 : 3.5, now);
+    addStress(rival, focus.kind === 'play' ? 4.1 : 1.7, now);
   }
 }
 
 export function settleRivalPlay(rival, move, played, moreWood, now) {
   if (!played) {
     if (move.pile !== NEW_PILE) rival.unread.add(move.pile);
-    if (!move.contested) addStress(rival, 3.5, now);
+    if (!move.contested) addStress(rival, 1.7, now);
     rival.next = now + 485;
     return;
   }
@@ -66,12 +66,12 @@ export function settleRivalPlay(rival, move, played, moreWood, now) {
     rival.inspectWood = moreWood;
     rival.usedPacket = true;
     rival.dryFlips = 0;
-    addStress(rival, -1.5, now);
+    addStress(rival, -2, now);
   } else {
     const position = Math.floor(rival.random() * (rival.posts.length + 1));
     rival.posts.splice(position, 0, move.source);
     rival.lastBlitz = now;
-    addStress(rival, -6, now);
+    addStress(rival, -7, now);
   }
 }
 
@@ -110,11 +110,21 @@ function planMove(rival, rules) {
 
   const blitzMoves = moves.filter(move => move.source !== WOOD_CARD);
   const choice = sample(blitzMoves.length ? blitzMoves : moves, rival.random);
-  const slipChance = (.012 + .34 * (rival.stress / 100) ** 2.55) * rival.pace.slip;
-  if (rival.random() < slipChance) {
-    const wrongPiles = seenPiles.filter(([, top]) => !matchesTop(top, choice.card, rules));
-    if (wrongPiles.length) return { ...choice, pile: sample(wrongPiles, rival.random)[0], mistake: true };
-  }
+  const stress = rival.stress / 100;
+  const roll = rival.random();
+  const colorSlip = (.0008 + .004 * stress ** 3.4) * rival.pace.slip;
+  const rankSlip = (.003 + .075 * stress ** 2.8) * rival.pace.slip;
+  if (roll >= colorSlip + rankSlip) return choice;
+
+  const wrongPiles = seenPiles.filter(([, top]) => {
+    if (matchesTop(top, choice.card, rules)) return false;
+    const gap = choice.card.rank - top.rank;
+    if (roll < colorSlip) {
+      return top.suit !== choice.card.suit && (gap === 1 || (rules.descending && gap === -1));
+    }
+    return top.suit === choice.card.suit && Math.abs(gap - 1) <= 1;
+  });
+  if (wrongPiles.length) return { ...choice, pile: sample(wrongPiles, rival.random)[0], mistake: true };
   return choice;
 }
 
@@ -174,7 +184,7 @@ export function stepRival(rival, state, now) {
   if (wood) {
     if (rival.hasPacket && !rival.usedPacket) {
       rival.dryFlips++;
-      addStress(rival, 2.7 + Math.min(rival.dryFlips, 4) * .5, now);
+      addStress(rival, 1 + Math.min(rival.dryFlips, 4) * .12, now);
     }
     rival.hasPacket = true;
     rival.usedPacket = false;

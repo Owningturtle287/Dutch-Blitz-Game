@@ -1,3 +1,5 @@
+import { playSound } from './sound.js';
+
 const signed = value => value > 0 ? `+${value}` : String(value).replace('-', '−');
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
@@ -71,6 +73,7 @@ export function showTally(dialog, { result, racers, cards, face, back, reducedMo
   }
 
   function showDelta(row, amount) {
+    playSound(amount > 0 ? 'place' : 'flip', { level: amount > 0 ? .17 : .13 });
     update(row);
     row.pulse?.cancel();
     row.delta.textContent = signed(amount);

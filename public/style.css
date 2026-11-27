@@ -89,7 +89,7 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
 .arena { display: flex; height: 100%; }
 .orientation-hint { display: none; grid-area: 1 / 3; place-self: start end; text-align: right; color: var(--seat-muted); font-size: .67rem; }
 .table {
-  --side-seat: clamp(72px, 13vw, 182px);
+  --side-seat: clamp(96px, 16vw, 200px);
   --north-seat: clamp(60px, 19dvh, 132px);
   --south-seat: clamp(82px, 25dvh, 172px);
   --table-gap: clamp(4px, 1.2dvh, 12px);
@@ -215,7 +215,7 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
   background: #2f1b12b9;
   place-self: center;
 }
-.seat.south { --seat-card: clamp(36px, 12.7dvh, 94px); grid-area: 3 / 2; border-color: #ebd09297; }
+.seat.south { --seat-card: min(clamp(36px, 12.7dvh, 94px), calc((100dvw - var(--side-seat) * 2 - 92px) / 6)); grid-area: 3 / 2; border-color: #ebd09297; }
 .seat.north { grid-area: 1 / 2; flex-direction: row-reverse; }
 .seat.west { grid-area: 2 / 1; }
 .seat.east { grid-area: 2 / 3; }
@@ -245,25 +245,41 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
 .seat-bubble {
   position: absolute;
   z-index: 6;
-  bottom: calc(100% + 3px);
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: calc(100% + 6px);
+  left: 0;
   width: max-content;
-  max-width: min(100%, 126px);
-  padding: 4px 6px;
-  border: 1px solid #b48a55;
-  border-radius: 7px;
+  max-width: clamp(100px, 18vw, 205px);
+  padding: 6px 9px;
+  border: 1px solid #c09968;
+  border-radius: 8px;
   background: #fff3d7;
   color: #452e1e;
   text-align: center;
-  font-size: clamp(.56rem, 2.2dvh, .83rem);
-  font-weight: 770;
-  line-height: 1.12;
+  font-size: clamp(.75rem, 2.75dvh, 1.05rem);
+  font-weight: 790;
+  line-height: 1.13;
+  text-wrap: balance;
   pointer-events: none;
-  box-shadow: 0 2px 4px #1f130e79;
+  box-shadow: 0 3px 8px #1f130e6b;
 }
-.north .seat-bubble, .south .seat-bubble { top: 0; bottom: auto; left: 0; transform: translateY(-18%); }
-.seat-bubble.blitz-call { background: #ffe0a0; color: #492714; font-size: clamp(.8rem, 3.6dvh, 1.5rem); }
+.seat-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 10px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid #c09968;
+  border-bottom: 1px solid #c09968;
+  background: inherit;
+  transform: rotate(45deg);
+}
+.east .seat-bubble { left: auto; right: 0; }
+.east .seat-bubble::after { left: auto; right: 10px; }
+.north .seat-bubble, .south .seat-bubble { top: 0; bottom: auto; transform: translateY(-12%); }
+.north .seat-bubble { left: auto; right: 0; }
+.north .seat-bubble::after { left: auto; right: 10px; }
+.seat-bubble.blitz-call { background: #ffe0a0; color: #492714; font-size: clamp(.97rem, 3.8dvh, 1.72rem); }
 .seat-cards, .wood-cards, .posts { display: flex; align-items: center; gap: var(--card-gap); }
 .seat-cards { gap: clamp(5px, 2dvh, 16px); }
 .north :is(.seat-cards, .wood-cards, .posts) { flex-direction: row-reverse; }
@@ -272,23 +288,23 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
 .zone-label strong { color: var(--seat-ink); font-variant-numeric: tabular-nums; }
 
 .seat:is(.east, .west) {
-  --seat-card: clamp(8px, min(5.7dvh, calc((100dvh - var(--north-seat) - var(--south-seat) - 78px) / 6)), 42px);
-  --card-gap: 3px;
+  --seat-card: clamp(24px, min(8.8dvh, calc((var(--side-seat) - 16px) / 2.8)), 56px);
+  --card-gap: clamp(2px, .65dvh, 6px);
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 .seat.west { --seat-angle: 90deg; }
 .seat.east { --seat-angle: -90deg; }
 :is(.east, .west) > .seat-heading { width: 100%; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 4px; }
 :is(.east, .west) .seat-stress { grid-column: 1 / -1; }
-:is(.east, .west) :is(.seat-cards, .wood-cards, .posts) { flex-direction: column; gap: var(--card-gap); }
-:is(.east, .west) :is(.wood-zone, .blitz-zone) { display: flex; align-items: center; gap: 4px; }
-.west :is(.wood-zone, .blitz-zone) { flex-direction: row-reverse; }
+:is(.east, .west) .seat-cards { display: grid; grid-template-areas: 'wood posts' 'blitz posts'; gap: 4px 6px; }
+.east .seat-cards { grid-template-areas: 'posts blitz' 'posts wood'; }
+:is(.east, .west) :is(.wood-cards, .posts) { flex-direction: column; gap: var(--card-gap); }
+:is(.east, .west) .wood-zone { grid-area: wood; }
+:is(.east, .west) .blitz-zone { grid-area: blitz; }
+:is(.east, .west) .post-zone { grid-area: posts; }
 :is(.east, .west) .post-zone .zone-label { display: none; }
-.east .blitz-zone { order: -1; }
-.east .wood-zone { order: 1; }
-.east .wood-cards { flex-direction: column-reverse; }
-.east .posts { flex-direction: column-reverse; }
+.east :is(.wood-cards, .posts) { flex-direction: column-reverse; }
 
 .card-slot {
   display: block;
@@ -549,10 +565,13 @@ dialog p { margin: 10px 0; color: var(--muted); line-height: 1.5; }
   .table { --side-seat: clamp(48px, 15vw, 132px); --north-seat: clamp(58px, 11dvh, 104px); --south-seat: clamp(62px, 15dvh, 128px); }
   .seat { --seat-card: clamp(17px, 5.1vw, 46px); --seat-gap: 3px; --card-gap: 3px; padding: 3px; }
   .seat.south { --seat-card: clamp(21px, 6vw, 55px); }
-  .seat:is(.east, .west) { --seat-card: clamp(12px, 4vw, 31px); }
+  .seat:is(.east, .west) { --seat-card: clamp(17px, 5.1vw, 46px); }
   :is(.east, .west) > .seat-heading { grid-template-columns: 1fr; gap: 2px; }
+  :is(.east, .west) .seat-cards { display: flex; flex-direction: column; }
+  .east .blitz-zone { order: -1; }
+  .east .wood-zone { order: 1; }
   .seat-stress { font-size: .47rem; }
-  :is(.east, .west) :is(.wood-zone, .blitz-zone) { flex-direction: column; gap: 2px; }
+  .seat-bubble { max-width: min(118px, 35vw); }
   .table-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table-control { min-height: 26px; height: 26px; }
   .play-controls .new-pile { min-height: 29px; font-size: .65rem; padding: 2px 4px; }
@@ -601,6 +620,11 @@ dialog p { margin: 10px 0; color: var(--muted); line-height: 1.5; }
   .score-board { --tally-card: clamp(22px, 7.4vw, 44px); --score-column: clamp(46px, 16vw, 84px); }
   .result-progress { grid-template-columns: 1fr; }
   .score-number strong { font-size: clamp(1.24rem, 7vw, 2.35rem); }
+}
+
+@media (orientation: landscape) and (max-height: 300px) {
+  .table { --north-seat: 55px; --south-seat: 72px; }
+  .seat:is(.east, .west) .zone-label { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
