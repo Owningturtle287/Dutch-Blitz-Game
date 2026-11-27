@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Overcurrent",
   "short_name": "Overcurrent",
-  "description": "A real-time card race. Clear your deck first.",
+  "description": "A real-time card race. Empty your Blitz pile first.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
