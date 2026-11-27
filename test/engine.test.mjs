@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TOTAL, NEW_PILE, RULES, RECYCLE_DELAY, accepts, destinations, legalMoves, newRace, play, recycle,
+  RANKS, SUITS, TOTAL, NEW_PILE, RULES, RECYCLE_DELAY, accepts, destinations, legalMoves, newRace, play, recycle,
   retuneIfBlocked, chooseMove, reactionTime,
 } from '../public/engine.js';
 
@@ -16,10 +16,27 @@ function randomFrom(seed) {
 }
 
 test('rise and fall wrap around and match accepts any rank of the same suit', () => {
-  assert.equal(accepts(pile('rise', 6), card(1, 'tide')), true);
-  assert.equal(accepts(pile('fall', 1), card(6, 'grove')), true);
-  assert.equal(accepts(pile('match', 6), card(6)), true);
-  assert.equal(accepts(pile('match', 6), card(6, 'tide')), false);
+  assert.equal(accepts(pile('rise', 10), card(1, 'tide')), true);
+  assert.equal(accepts(pile('rise', 6), card(7, 'tide')), true);
+  assert.equal(accepts(pile('fall', 1), card(10, 'grove')), true);
+  assert.equal(accepts(pile('match', 3), card(10)), true);
+  assert.equal(accepts(pile('match', 3), card(10, 'tide')), false);
+});
+
+test('each racer has one of every rank from 1 through 10 in all four colors', () => {
+  const state = newRace(4, randomFrom(18));
+  assert.equal(RANKS, 10);
+  assert.equal(SUITS.length, 4);
+  assert.equal(TOTAL, 40);
+  const ranks = Array.from({ length: 10 }, (_, index) => index + 1);
+  for (const { hand, deck } of state.players) {
+    const cards = [...hand, ...deck];
+    assert.equal(cards.length, 40);
+    assert.equal(new Set(cards.map(item => item.id)).size, 40);
+    for (const suit of SUITS) {
+      assert.deepEqual(cards.filter(item => item.suit === suit).map(item => item.rank).sort((a, b) => a - b), ranks);
+    }
+  }
 });
 
 test('a concurrent play invalidates the old destination and stale card IDs cannot consume replacement cards', () => {

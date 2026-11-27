@@ -1,5 +1,5 @@
 export const SUITS = ['spark', 'tide', 'ember', 'grove'];
-export const RANKS = 6;
+export const RANKS = 10;
 export const TOTAL = SUITS.length * RANKS;
 export const RULES = ['rise', 'match', 'fall'];
 export const NEW_PILE = -1;

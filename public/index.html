@@ -27,13 +27,10 @@
       <section class="lobby" id="lobby" aria-labelledby="lobby-title">
         <div class="lobby-art" aria-hidden="true">
           <div class="art-orbit"></div>
-          <div class="card-face suit-tide art-tide"><span class="card-rank">2</span><span class="suit-icon"></span><span class="card-corner">02</span></div>
-          <div class="card-face suit-grove art-grove"><span class="card-rank">6</span><span class="suit-icon"></span><span class="card-corner">06</span></div>
-          <div class="card-face suit-spark art-spark"><span class="card-rank">3</span><span class="suit-icon"></span><span class="card-corner">03</span></div>
         </div>
         <div class="lobby-copy">
           <h1 id="lobby-title">Clear<br> your deck<span>.</span></h1>
-          <p>Race the table in real time. Play all 24 cards before your rivals do.</p>
+          <p>Race the table in real time. Play all 40 cards before your rivals do.</p>
           <form id="setup">
             <fieldset>
               <legend>Opponents</legend>
@@ -92,14 +89,14 @@
 
   <dialog id="rules-dialog" aria-labelledby="rules-title">
     <form method="dialog" class="dialog-top"><h2 id="rules-title">How to race</h2><button class="close" aria-label="Close rules">×</button></form>
-    <p>Everyone plays at once. Clear all <strong>24 cards</strong> to win. Every play automatically draws a replacement until your deck runs out.</p>
+    <p>Everyone plays at once. Clear all <strong>40 cards</strong> to win. Each deck has a 1 through 10 in yellow, blue, red, and green.</p>
     <dl class="rule-list">
-      <div><dt><span>↑</span> Rise</dt><dd>Play one number higher. After 6 comes 1.</dd></div>
-      <div><dt><span>＝</span> Match</dt><dd>Play the same symbol. Any number works.</dd></div>
-      <div><dt><span>↓</span> Fall</dt><dd>Play one number lower. After 1 comes 6.</dd></div>
+      <div><dt><span>↑</span> Rise</dt><dd>Play one number higher. After 10 comes 1.</dd></div>
+      <div><dt><span>＝</span> Match</dt><dd>Play the same color. Any number works.</dd></div>
+      <div><dt><span>↓</span> Fall</dt><dd>Play one number lower. After 1 comes 10.</dd></div>
     </dl>
     <p>Play a <strong>1</strong> to open a new pile. New piles cycle through Rise, Match, and Fall. Swipe the row or use the arrows to see more piles.</p>
-    <p>Tap a highlighted card to play it. If it fits in several places, choose a pile. You can also drag a card directly onto a pile.</p>
+    <p>Tap a highlighted card or drag it to a pile. If it fits in several places, choose a pile. Each play draws a replacement while cards remain in your deck.</p>
     <p>Select a card and tap <strong>Swap card</strong> to trade it for your next card. If nobody can play, the tops of the piles reset.</p>
     <p class="credits">Suit icons by <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer">Lucide</a> under the <a href="./assets/LUCIDE-LICENSE.txt">ISC license</a>.</p>
   </dialog>
@@ -125,6 +122,14 @@
     <button class="ghost full" id="setup-again" type="button">Change setup</button>
   </dialog>
 
+  <template id="card-template">
+    <span class="card-face" aria-hidden="true">
+      <span class="card-trim"></span>
+      <span class="card-rank"></span>
+      <span class="card-emblem"><span class="suit-icon"></span></span>
+      <span class="card-corner"></span>
+    </span>
+  </template>
   <template id="pile-template"><button class="pile" type="button"><span class="pile-title"><span class="pile-order" aria-hidden="true"></span><span class="pile-kind" aria-hidden="true"></span></span><span class="pile-card"></span><span class="pile-rule"></span></button></template>
   <script type="module" src="./main.js"></script>
 </body>

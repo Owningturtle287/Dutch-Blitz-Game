@@ -7,12 +7,14 @@ const $ = selector => document.querySelector(selector);
 const pileStrip = $('#piles');
 const newPileButton = $('#new-pile');
 const handButtons = [...document.querySelectorAll('.hand-card')];
+const cardTemplate = $('#card-template').content.firstElementChild;
 const rivals = [
   { name: 'Nova', color: '#b2def6' },
   { name: 'Sage', color: '#bfe3a2' },
   { name: 'Dash', color: '#ffc0a4' },
 ];
 const pileSymbols = { rise: '↑', match: '=', fall: '↓' };
+const colors = { spark: 'Yellow', tide: 'Blue', ember: 'Red', grove: 'Green' };
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const scheme = matchMedia('(display-mode: standalone)');
 
@@ -41,7 +43,7 @@ function saveSetting(key, value) {
 }
 
 const capitalize = word => word.charAt(0).toUpperCase() + word.slice(1);
-const cardName = card => `${capitalize(card.suit)} ${card.rank}`;
+const cardName = card => `${colors[card.suit]} ${card.rank}`;
 const timeNow = () => elapsed + (startedAt === null ? 0 : performance.now() - startedAt);
 const openDialog = () => document.querySelector('dialog[open]');
 const canPlay = () => Boolean(race && race.winner === null && startedAt !== null && !openDialog());
@@ -52,10 +54,10 @@ function formatTime(milliseconds) {
 }
 
 function cardFace(card) {
-  const face = document.createElement('span');
-  face.className = `card-face suit-${card.suit}`;
-  face.setAttribute('aria-hidden', 'true');
-  face.innerHTML = `<span class="card-rank">${card.rank}</span><span class="suit-icon"></span><span class="card-corner">0${card.rank}</span>`;
+  const face = cardTemplate.cloneNode(true);
+  face.classList.add(`suit-${card.suit}`);
+  face.querySelector('.card-rank').textContent = card.rank;
+  face.querySelector('.card-corner').textContent = card.rank;
   return face;
 }
 
@@ -156,7 +158,7 @@ function renderPiles(piles, targets) {
       button.querySelector('.pile-kind').append(kind, ` ${capitalize(pile.rule)}`);
       pileStrip.append(button);
     }
-    const instruction = pile.rule === 'match' ? `${capitalize(pile.top.suit)} only` : `Play a ${nextRank(pile)}`;
+    const instruction = pile.rule === 'match' ? `${colors[pile.top.suit]} only` : `Play a ${nextRank(pile)}`;
     showCard(button.querySelector('.pile-card'), pile.top);
     button.querySelector('.pile-rule').textContent = instruction;
     button.classList.toggle('target', targets.includes(index));
@@ -297,7 +299,7 @@ function finishRace() {
   const win = race.winner === 0;
   const winner = win ? 'You' : rivals[race.winner - 1].name;
   const speed = formatTime(elapsed);
-  const recordKey = `record:${settings.difficulty}:${settings.opponents}`;
+  const recordKey = `record:${TOTAL}:${settings.difficulty}:${settings.opponents}`;
   const previousBest = readSetting(recordKey, null);
   const improved = win && (previousBest === null || elapsed < previousBest);
   if (improved) saveSetting(recordKey, elapsed);
@@ -440,6 +442,12 @@ function showDialog(dialog) {
 }
 
 const previous = readSetting('setup', {});
+const lobbyArt = $('.lobby-art');
+for (const card of [{ suit: 'grove', rank: 6 }, { suit: 'tide', rank: 2 }, { suit: 'ember', rank: 7 }, { suit: 'spark', rank: 10 }]) {
+  const face = cardFace(card);
+  face.classList.add(`art-${card.suit}`);
+  lobbyArt.append(face);
+}
 const setupForm = $('#setup');
 if ([1, 2, 3].includes(previous.opponents)) setupForm.elements.opponents.value = String(previous.opponents);
 if (['relaxed', 'quick', 'expert'].includes(previous.difficulty)) setupForm.elements.difficulty.value = previous.difficulty;
