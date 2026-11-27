@@ -1,10 +1,12 @@
 import {
-  DEFAULT_RULES, NEW_PILE, WOOD_CARD, RANKS, OPEN_RANK, newRace, visibleCard, destinations,
-  legalMoves, woodCount, isBlocked, flipWood, play, score, chooseMove, reactionTime,
+  DEFAULT_RULES, DRAW_SIZE, NEW_PILE, WOOD_CARD, RANKS, OPEN_RANK, newRace, visibleCard, destinations,
+  legalMoves, woodCount, isBlocked, flipWood, play, score,
 } from './engine.js';
 import { newMatch, recordRound, levelProgress } from './match.js';
 import { createProfileStore, normalizeName } from './profiles.js';
 import { showTally } from './tally.js';
+import { newRival, noticePileChange, settleRivalPlay, stepRival } from './rival-ai.js';
+import { chooseRivalNames } from './rival-names.js';
 
 const $ = selector => document.querySelector(selector);
 const table = $('.table');
@@ -19,12 +21,13 @@ const colors = { spark: 'Yellow', tide: 'Blue', ember: 'Red', grove: 'Green' };
 const cornerArt = { spark: 'girl-corners', tide: 'boy-corners', ember: 'boy-corners', grove: 'girl-corners' };
 const toolNames = { wagon: 'wagon', pump: 'hand pump', barrel: 'barrel', plow: 'plow' };
 const seating = [
-  { name: 'You', side: 'south' },
-  { name: 'Sage', side: 'north' },
-  { name: 'Nova', side: 'west', angle: 90 },
-  { name: 'Dash', side: 'east', angle: -90 },
+  { side: 'south' },
+  { side: 'north' },
+  { side: 'west', angle: 90 },
+  { side: 'east', angle: -90 },
 ];
 const ROUND_DELAY = 10000;
+const BLITZ_HOLD = 1500;
 
 let race;
 let match;
@@ -38,6 +41,7 @@ let finishTimer;
 let roundStarted = false;
 let blocked = false;
 let bots = [];
+let watched = new Set();
 let message;
 let installPrompt;
 let drag;
@@ -59,7 +63,7 @@ function browserStorage() {
 }
 
 const profiles = createProfileStore(browserStorage());
-const racerName = index => index === 0 ? match.settings.name : seating[index].name;
+const racerName = index => index === 0 ? match.settings.name : match.rivalNames[index - 1];
 const cardName = card => `${colors[card.suit]} ${card.rank}`;
 const timeNow = () => elapsed + (startedAt === null ? 0 : performance.now() - startedAt);
 const openDialog = () => document.querySelector('dialog[open]');
@@ -119,7 +123,7 @@ function makeGrip() {
   return hand;
 }
 
-function carryCard(visual, from, to, { duration = 350, delay = 0, fromAngle = 0, toAngle = 0 } = {}) {
+function carryCard(visual, from, to, { duration = 350, delay = 0, fromAngle = 0, toAngle = 0, returnCard = false } = {}) {
   if (motion.matches || !from?.width || !to?.width) return;
   const flight = document.createElement('div');
   flight.className = 'flight';
@@ -140,13 +144,20 @@ function carryCard(visual, from, to, { duration = 350, delay = 0, fromAngle = 0,
   const middleAngle = fromAngle * .42 + toAngle * .58 + (x < 0 ? -7 : 7);
   const middle = `translate(${x * .42}px, ${y * .42 - 7}px) rotate(${middleAngle}deg)`;
   const end = `translate(0, 0) rotate(${toAngle}deg)`;
-  const animation = flight.animate([
+  const frames = returnCard ? [
+    { transform: start, opacity: 1 },
+    { transform: end, opacity: 1, offset: .47 },
+    { transform: end, opacity: 1, offset: .58 },
+    { transform: start, opacity: 1, offset: .94 },
+    { transform: start, opacity: 0 },
+  ] : [
     { transform: start, opacity: 1 },
     { transform: start, opacity: 1, offset: .2 },
     { transform: middle, opacity: 1, offset: .54 },
     { transform: end, opacity: 1, offset: .88 },
     { transform: end, opacity: 0 },
-  ], { duration, delay, easing: 'ease-in-out' });
+  ];
+  const animation = flight.animate(frames, { duration, delay, easing: 'ease-in-out' });
   grip.animate([
     { transform: 'translate(25%, 30%)', opacity: 0 },
     { transform: 'translate(0)', opacity: 1, offset: .2 },
@@ -171,14 +182,28 @@ function createSeats() {
     const element = seatTemplate.cloneNode(true);
     element.classList.add(side);
     element.setAttribute('aria-label', index === 0 ? 'Your seat' : `${name}'s seat`);
-    element.querySelector('.seat-name').textContent = name;
+    const nameLabel = element.querySelector('.seat-name');
+    nameLabel.textContent = name;
+    nameLabel.title = name;
+    const stress = element.querySelector('.seat-stress');
+    const meter = stress.querySelector('meter');
+    stress.hidden = index === 0;
+    meter.setAttribute('aria-label', `${name}’s stress`);
     const stock = element.querySelector('.wood-deck');
     const blitz = element.querySelector('.blitz-deck');
     stock.append(cardBack(player.tool));
     blitz.append(cardBack(player.tool));
     const slots = new Map([...element.querySelectorAll('.play-card')].map(button => [sourceOf(button), button]));
+    if (index === 0) {
+      const flip = () => {
+        if (canPlay() && !stock.disabled) turnWood(0);
+      };
+      stock.addEventListener('click', flip);
+      element.querySelector('.wood-label').addEventListener('click', flip);
+    }
     return {
-      element, slots, stock, blitz, angle,
+      element, slots, stock, blitz, angle, stress, meter,
+      stressValue: stress.querySelector('strong'), bubble: element.querySelector('.seat-bubble'), looking: null,
       points: element.querySelector('.seat-score'),
       woodCount: element.querySelector('.wood-count'),
       blitzCount: element.querySelector('.blitz-count'),
@@ -273,7 +298,7 @@ function renderSeat(player, index, active) {
   seat.woodCount.textContent = wood;
   seat.blitzCount.textContent = blitz;
   seat.stock.disabled = !human || !active || !wood;
-  const woodAction = player.wood.length ? 'Flip up to 3 cards.' : 'Reshuffle and flip up to 3 cards.';
+  const woodAction = player.wood.length >= Math.min(DRAW_SIZE, wood) ? 'Flip Wood cards.' : 'Flip and reshuffle Wood cards.';
   seat.stock.setAttribute('aria-label', `Wood pile, ${wood} cards left, ${player.wood.length} in stock. ${human && wood ? woodAction : ''}`.trim());
   seat.stock.classList.toggle('stacked', player.wood.length > 1);
   seat.stock.classList.toggle('empty', !player.wood.length);
@@ -313,9 +338,9 @@ function updateStatus() {
   let hint = '';
   if (roundStarted) {
     if (blocked) hint = 'No legal moves. Restart from Pause.';
-    else if (targets.length) hint = 'Choose a highlighted pile.';
+    else if (targets.length) hint = drag?.ghost ? 'Release on the table to play.' : 'Choose a highlighted pile.';
     else if (selected === WOOD_CARD) hint = 'Wait for a match or flip the Wood pile again.';
-    else if (legalMoves(player, race.piles, race.rules).length) hint = 'Tap or drag a highlighted card.';
+    else if (legalMoves(player, race.piles, race.rules).length) hint = 'Drag a highlighted card, or tap a 1.';
     else if (woodCount(player)) hint = 'Flip the Wood pile or wait for a match.';
     else hint = 'Waiting for a match…';
   }
@@ -336,6 +361,7 @@ function render() {
   newPileButton.disabled = !canOpen;
   newPileButton.classList.toggle('ready', canOpen);
   newPileButton.classList.toggle('target', targets.includes(NEW_PILE));
+  if (drag?.ghost) previewDrop(nearestTarget(drag.source, drag.clientX, drag.clientY));
   updateStatus();
 }
 
@@ -363,6 +389,8 @@ function applyPlay(player, source, destination, cardId, from) {
   const index = opening ? race.piles.length : destination;
   const card = play(race, player, source, destination, cardId);
   if (!card) return false;
+  const now = timeNow();
+  bots.forEach(bot => noticePileChange(bot, index, player, now));
   if (player === 0) {
     selected = null;
     message = null;
@@ -385,10 +413,12 @@ function applyPlay(player, source, destination, cardId, from) {
 function turnWood(player) {
   const seat = seats[player];
   const origin = slotRect(seat.stock);
-  const reshuffled = !race.players[player].wood.length;
+  const racer = race.players[player];
+  const reshuffled = racer.wood.length < Math.min(DRAW_SIZE, woodCount(racer));
   const drawn = flipWood(race, player);
   if (!drawn) return;
   if (player === 0) {
+    if (drag?.source === WOOD_CARD) cancelDrag();
     selected = null;
     const action = reshuffled ? 'Reshuffled Wood and flipped' : 'Flipped';
     announce(`${action} ${drawn.length} ${drawn.length === 1 ? 'card' : 'cards'}.`, 800);
@@ -402,6 +432,59 @@ function turnWood(player) {
   revealTransfer(top, origin, receiver, { delay: (drawn.length - 1) * 55, duration: 280, angle: seat.angle });
 }
 
+function showBubble(seat, text = '', blitz = false) {
+  const bubble = seat.bubble;
+  if (bubble.textContent !== text) bubble.textContent = text;
+  bubble.hidden = !text;
+  bubble.classList.toggle('blitz-call', blitz);
+}
+
+function renderRivals() {
+  const nextWatched = new Set();
+  for (const bot of bots) {
+    const seat = seats[bot.player];
+    const level = Math.round(bot.stress);
+    if (seat.meter.value !== level) {
+      seat.meter.value = level;
+      seat.stressValue.textContent = level;
+      seat.stress.dataset.level = level >= 75 ? 'high' : level >= 44 ? 'medium' : 'low';
+    }
+    const looking = bot.focus?.kind === 'card' ? seat.slots.get(bot.focus.source) : null;
+    if (seat.looking !== looking) {
+      seat.looking?.classList.remove('rival-looking');
+      seat.looking = looking;
+      looking?.classList.add('rival-looking');
+    }
+    if (bot.focus?.kind === 'pile') {
+      const pile = pileGrid.children[bot.focus.pile];
+      if (pile) nextWatched.add(pile);
+    }
+    showBubble(seat, bot.speech?.text);
+  }
+  for (const pile of watched) if (!nextWatched.has(pile)) pile.classList.remove('rival-watched');
+  for (const pile of nextWatched) if (!watched.has(pile)) pile.classList.add('rival-watched');
+  watched = nextWatched;
+}
+
+function rivalMiss(bot, move) {
+  const pile = pileGrid.children[move.pile];
+  const seat = seats[bot.player];
+  const card = visibleCard(race.players[bot.player], move.source);
+  if (!pile || card?.id !== move.cardId) return;
+  const source = seat.slots.get(move.source);
+  const target = pile.querySelector('.pile-card');
+  const duration = 560;
+  carryCard(cardFace(card), slotRect(source), target.getBoundingClientRect(), { duration, fromAngle: seat.angle, returnCard: true });
+  if (!motion.matches) {
+    source.firstElementChild.animate([
+      { opacity: .28 }, { opacity: .28, offset: .88 }, { opacity: 1 },
+    ], { duration });
+  }
+  pile.animate([{ outline: '2px solid #e7a384', offset: 0 }, { outline: '2px solid transparent', offset: 1 }], {
+    delay: motion.matches ? 0 : 180, duration: 230,
+  });
+}
+
 function tick() {
   if (!race || startedAt === null || race.finisher !== null) return;
   const now = timeNow();
@@ -411,19 +494,24 @@ function tick() {
     render();
   }
   if (blocked) return updateStatus();
-  const due = bots.filter(bot => bot.next <= now).sort((a, b) => a.next - b.next);
-  for (const bot of due) {
-    if (now >= bot.rhythmUntil) {
-      bot.rhythm = .73 + Math.random() * .60;
-      bot.rhythmUntil = now + 2300 + Math.random() * 3900;
+
+  for (const bot of [...bots].sort((a, b) => a.next - b.next)) {
+    const move = stepRival(bot, race, now);
+    if (move?.kind === 'flip') turnWood(bot.player);
+    if (move?.kind === 'play') {
+      const played = !move.mistake && applyPlay(bot.player, move.source, move.pile, move.cardId);
+      const moreWood = race.players[bot.player].woodShown.length > 0;
+      settleRivalPlay(bot, move, played, moreWood, now);
+      if (!played) rivalMiss(bot, move);
     }
-    const move = chooseMove(race, bot.player, match.settings.difficulty);
-    if (move?.flip) turnWood(bot.player);
-    else if (move) applyPlay(bot.player, move.source, move.pile, visibleCard(race.players[bot.player], move.source).id);
-    bot.next = now + reactionTime(bot.player, match.settings.difficulty, bot.rhythm);
     if (race.finisher !== null) return;
   }
+  renderRivals();
   updateStatus();
+}
+
+function setTableControls(disabled) {
+  for (const button of table.querySelectorAll('.table-controls button')) button.disabled = disabled;
 }
 
 function stopClock() {
@@ -452,9 +540,9 @@ function startRace() {
   elapsed = 0;
   roundStarted = false;
   ignoreClicksUntil = 0;
-  bots = race.players.slice(1).map((_, index) => ({
-    player: index + 1, next: ROUND_DELAY + 900 + Math.random() * 430, rhythm: 1, rhythmUntil: 0,
-  }));
+  bots = race.players.slice(1).map((_, index) => newRival(index + 1, match.settings.difficulty, ROUND_DELAY));
+  watched.clear();
+  setTableControls(false);
   $('#lobby').hidden = true;
   $('#arena').hidden = false;
   createSeats();
@@ -474,8 +562,14 @@ function showSetup() {
   $('.start').focus();
 }
 
+function beginMatch(settings, previousNames = []) {
+  match = newMatch(settings, crypto.randomUUID());
+  match.rivalNames = chooseRivalNames(settings.players - 1, [settings.name, ...previousNames]);
+  startRace();
+}
+
 function nextRound() {
-  if (match.completed === match.settings.rounds) match = newMatch(match.settings, crypto.randomUUID());
+  if (match.completed === match.settings.rounds) return beginMatch(match.settings, match.rivalNames);
   startRace();
 }
 
@@ -483,6 +577,13 @@ function finishRace() {
   stopClock();
   const result = recordRound(match, roundNumber, race.players.map(score));
   if (!result) return;
+  setTableControls(true);
+  seats.forEach((seat, index) => {
+    seat.looking?.classList.remove('rival-looking');
+    showBubble(seat, index === race.finisher ? 'Blitz!' : '', index === race.finisher);
+  });
+  for (const pile of watched) pile.classList.remove('rival-watched');
+  watched.clear();
 
   const racers = race.players.map((racer, index) => ({
     name: racerName(index), tool: racer.tool, played: racer.played, remaining: racer.blitz.length,
@@ -498,6 +599,7 @@ function finishRace() {
   $('#result-progress').hidden = true;
 
   finishTimer = setTimeout(() => {
+    showBubble(seats[race.finisher]);
     openDialog()?.close();
     showTally($('#finish-dialog'), {
       result, racers, cards, face: cardFace, back: cardBack, reducedMotion: motion.matches,
@@ -510,7 +612,7 @@ function finishRace() {
         progress.hidden = false;
       },
     });
-  }, motion.matches ? 0 : 465);
+  }, BLITZ_HOLD);
 }
 
 function playFromSeat(source, pile, from) {
@@ -521,33 +623,67 @@ function playFromSeat(source, pile, from) {
   render();
 }
 
-function selectCard(source) {
-  if (!canPlay()) return;
+function activateCard(button, keyboard) {
+  const source = sourceOf(button);
   const card = visibleCard(race.players[0], source);
-  const options = targetsFor(card);
-  message = null;
-  if (options.length === 1) return playFromSeat(source, options[0]);
-  selected = selected === source ? null : source;
+  if (card?.rank === OPEN_RANK) return playFromSeat(source, NEW_PILE);
+  selected = keyboard && selected !== source ? source : null;
+  if (!keyboard) announce('Drag the card onto the table.', 900);
   render();
 }
 
+function nearestTarget(source, x, y) {
+  const bounds = table.getBoundingClientRect();
+  if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return null;
+
+  const card = visibleCard(race.players[0], source);
+  let best = null;
+  let bestDistance = Infinity;
+  for (const index of targetsFor(card)) {
+    const button = index === NEW_PILE ? newPileButton : pileGrid.children[index];
+    const rect = button.getBoundingClientRect();
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return button;
+    const distance = (x - (rect.left + rect.width / 2)) ** 2 + (y - (rect.top + rect.height / 2)) ** 2;
+    if (distance < bestDistance) {
+      best = button;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function previewDrop(target) {
+  const previous = table.querySelector('.drag-over');
+  if (previous !== target) previous?.classList.remove('drag-over');
+  target?.classList.add('drag-over');
+}
+
 function cancelDrag() {
-  if (!drag) return;
+  if (!drag) return false;
+  const hadGhost = Boolean(drag.ghost);
   drag.button.classList.remove('dragging');
-  table.querySelector('.drag-over')?.classList.remove('drag-over');
+  previewDrop(null);
   drag.ghost?.remove();
+  if (hadGhost) selected = null;
   drag = null;
+  return hadGhost;
 }
 
 table.addEventListener('pointerdown', event => {
   const button = event.target.closest('.south .play-card');
   if (!button || !event.isPrimary || event.button !== 0 || button.disabled || !canPlay()) return;
-  drag = { id: event.pointerId, x: event.clientX, y: event.clientY, button, source: sourceOf(button) };
+  const source = sourceOf(button);
+  drag = {
+    id: event.pointerId, x: event.clientX, y: event.clientY, button, source,
+    cardId: visibleCard(race.players[0], source).id,
+  };
   button.setPointerCapture(event.pointerId);
 });
 
 table.addEventListener('pointermove', event => {
   if (drag?.id !== event.pointerId || !canPlay()) return;
+  drag.clientX = event.clientX;
+  drag.clientY = event.clientY;
   if (!drag.ghost) {
     if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 9) return;
     const rect = slotRect(drag.button);
@@ -565,44 +701,46 @@ table.addEventListener('pointermove', event => {
   }
   drag.ghost.style.left = `${event.clientX - drag.ghost.offsetWidth / 2}px`;
   drag.ghost.style.top = `${event.clientY - drag.ghost.offsetHeight / 2}px`;
-  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-pile].target');
-  const previous = table.querySelector('.drag-over');
-  if (previous !== target) previous?.classList.remove('drag-over');
-  target?.classList.add('drag-over');
+  previewDrop(nearestTarget(drag.source, event.clientX, event.clientY));
 });
 
 table.addEventListener('pointerup', event => {
   if (drag?.id !== event.pointerId) return;
   if (!drag.ghost) return cancelDrag();
-  const { source, ghost } = drag;
+  const { source, ghost, cardId } = drag;
   const origin = ghost.getBoundingClientRect();
-  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-pile]:enabled');
+  const sameCard = visibleCard(race.players[0], source)?.id === cardId;
+  const target = sameCard ? nearestTarget(source, event.clientX, event.clientY) : null;
   ignoreClicksUntil = performance.now() + 350;
   cancelDrag();
   if (target) playFromSeat(source, Number(target.dataset.pile), origin);
+  else render();
 });
 
-table.addEventListener('pointercancel', cancelDrag);
-table.addEventListener('lostpointercapture', cancelDrag);
+for (const eventName of ['pointercancel', 'lostpointercapture']) {
+  table.addEventListener(eventName, event => {
+    if (drag?.id === event.pointerId && cancelDrag() && canPlay()) render();
+  });
+}
 table.addEventListener('click', event => {
   if (!canPlay()) return;
   const cardButton = event.target.closest('.south .play-card');
+  const keyboard = event.detail === 0;
   if (cardButton) {
-    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) selectCard(sourceOf(cardButton));
+    if (keyboard || performance.now() >= ignoreClicksUntil) activateCard(cardButton, keyboard);
     return;
   }
-  if (event.target.closest('.south .wood-deck')) return turnWood(0);
   const button = event.target.closest('[data-pile]');
   if (!button) return;
   const pile = Number(button.dataset.pile);
-  if (selected !== null) return playFromSeat(selected, pile);
+  if (keyboard && selected !== null && !drag) return playFromSeat(selected, pile);
   if (pile === NEW_PILE) {
     const player = race.players[0];
     const sources = [...player.posts.keys(), WOOD_CARD];
     const source = sources.find(option => visibleCard(player, option)?.rank === OPEN_RANK);
     if (source !== undefined) return playFromSeat(source, pile);
   }
-  announce('Choose a face-up card first.');
+  announce('Drag a face-up card onto the table.');
   updateStatus();
 });
 
@@ -721,8 +859,7 @@ setupForm.addEventListener('submit', event => {
   nameInput.value = profile.name;
   saveSetting('setup', settings);
   saveSetting('player-name', profile.name);
-  match = newMatch({ ...settings, name: profile.name }, crypto.randomUUID());
-  startRace();
+  beginMatch({ ...settings, name: profile.name });
 });
 
 for (const button of [$('#help'), $('#lobby-rules')]) {

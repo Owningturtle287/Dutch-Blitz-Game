@@ -168,6 +168,7 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
 .pile-cue { max-width: 100%; overflow: hidden; color: #503a2c; font-size: .61rem; line-height: 10px; font-weight: 780; text-overflow: ellipsis; white-space: nowrap; }
 .pile.closed { border-color: #f1d4968c; background: #8f694d; }
 .pile.closed .pile-cue { color: #fff5e5; }
+.pile.rival-watched:not(.target):not(:focus-visible) { outline: 2px dashed #f2bc72; outline-offset: -2px; }
 .pile.target, .new-pile.target { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); background: #d9f0db; }
 .pile.drag-over, .new-pile.drag-over { background: #bde8c6; }
 
@@ -202,6 +203,8 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
   --seat-card: clamp(25px, 8.8dvh, 56px);
   --card-gap: clamp(3px, .9dvh, 7px);
   min-width: 0;
+  max-width: 100%;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -219,7 +222,48 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
 .seat-heading { display: grid; gap: 2px; text-align: center; }
 .seat-name { font-size: clamp(.67rem, 2.7dvh, 1rem); line-height: 1.05; }
 .south .seat-name { max-width: clamp(30px, 10vw, 88px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat:not(.south) .seat-name { max-width: 11ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat-score { font-size: clamp(.56rem, 2.3dvh, .79rem); color: var(--seat-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.seat-stress {
+  --stress-color: #a3d394;
+  display: grid;
+  grid-template-columns: minmax(8px, 1fr) auto;
+  align-items: center;
+  gap: 3px;
+  color: var(--stress-color);
+  font-size: clamp(.5rem, 1.85dvh, .72rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.seat-stress[data-level=medium] { --stress-color: #ffd18c; }
+.seat-stress[data-level=high] { --stress-color: #ffab91; }
+.seat-stress meter { width: 100%; height: 7px; display: block; }
+.seat-stress meter::-webkit-meter-bar { background: #f4dbc144; border: 0; }
+.seat-stress meter::-webkit-meter-optimum-value { background: var(--stress-color); }
+.seat-stress meter::-moz-meter-bar { background: var(--stress-color); }
+.seat-bubble {
+  position: absolute;
+  z-index: 6;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(100%, 126px);
+  padding: 4px 6px;
+  border: 1px solid #b48a55;
+  border-radius: 7px;
+  background: #fff3d7;
+  color: #452e1e;
+  text-align: center;
+  font-size: clamp(.56rem, 2.2dvh, .83rem);
+  font-weight: 770;
+  line-height: 1.12;
+  pointer-events: none;
+  box-shadow: 0 2px 4px #1f130e79;
+}
+.north .seat-bubble, .south .seat-bubble { top: 0; bottom: auto; left: 0; transform: translateY(-18%); }
+.seat-bubble.blitz-call { background: #ffe0a0; color: #492714; font-size: clamp(.8rem, 3.6dvh, 1.5rem); }
 .seat-cards, .wood-cards, .posts { display: flex; align-items: center; gap: var(--card-gap); }
 .seat-cards { gap: clamp(5px, 2dvh, 16px); }
 .north :is(.seat-cards, .wood-cards, .posts) { flex-direction: row-reverse; }
@@ -228,14 +272,15 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
 .zone-label strong { color: var(--seat-ink); font-variant-numeric: tabular-nums; }
 
 .seat:is(.east, .west) {
-  --seat-card: clamp(9px, min(5.7dvh, calc((100dvh - var(--north-seat) - var(--south-seat) - 68px) / 6)), 42px);
+  --seat-card: clamp(8px, min(5.7dvh, calc((100dvh - var(--north-seat) - var(--south-seat) - 78px) / 6)), 42px);
   --card-gap: 3px;
   flex-direction: column;
   gap: 3px;
 }
 .seat.west { --seat-angle: 90deg; }
 .seat.east { --seat-angle: -90deg; }
-:is(.east, .west) > .seat-heading { display: flex; align-items: baseline; gap: 4px; }
+:is(.east, .west) > .seat-heading { width: 100%; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 4px; }
+:is(.east, .west) .seat-stress { grid-column: 1 / -1; }
 :is(.east, .west) :is(.seat-cards, .wood-cards, .posts) { flex-direction: column; gap: var(--card-gap); }
 :is(.east, .west) :is(.wood-zone, .blitz-zone) { display: flex; align-items: center; gap: 4px; }
 .west :is(.wood-zone, .blitz-zone) { flex-direction: row-reverse; }
@@ -273,6 +318,9 @@ body:has(.arena:not([hidden])) { overflow: hidden; }
 .blitz-deck.empty .card-back { visibility: hidden; }
 .wood-deck.empty .card-back { opacity: .28; }
 .south .wood-deck:not(:disabled) { box-shadow: 0 0 0 1px #f7d28cb0; }
+.south .wood-deck .card-back { pointer-events: none; }
+.south .wood-zone:has(.wood-deck:not(:disabled)) .wood-label { cursor: pointer; }
+.card-slot.rival-looking { outline: 1px dashed #f2bc72; outline-offset: 1px; }
 .wood-up.packet::before {
   content: '';
   position: absolute;
@@ -502,7 +550,8 @@ dialog p { margin: 10px 0; color: var(--muted); line-height: 1.5; }
   .seat { --seat-card: clamp(17px, 5.1vw, 46px); --seat-gap: 3px; --card-gap: 3px; padding: 3px; }
   .seat.south { --seat-card: clamp(21px, 6vw, 55px); }
   .seat:is(.east, .west) { --seat-card: clamp(12px, 4vw, 31px); }
-  :is(.east, .west) > .seat-heading { display: grid; gap: 2px; }
+  :is(.east, .west) > .seat-heading { grid-template-columns: 1fr; gap: 2px; }
+  .seat-stress { font-size: .47rem; }
   :is(.east, .west) :is(.wood-zone, .blitz-zone) { flex-direction: column; gap: 2px; }
   .table-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table-control { min-height: 26px; height: 26px; }

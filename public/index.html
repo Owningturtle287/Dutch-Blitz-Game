@@ -112,8 +112,8 @@
     <p>Each player starts with 27 cards in the Wood pile, three face-up cards, and 10 cards in the Blitz pile. After the 10-second countdown, everyone plays at once.</p>
     <ul class="rule-list">
       <li>Play a <strong>1</strong> to open a shared pile. By default, each next card must be one number higher and the same color. A 10 played on a 9 goes face down and closes the pile.</li>
-      <li>Tap or drag one of your three face-up cards. The top Blitz card fills the space it leaves. Playing the last Blitz card into that space ends the round.</li>
-      <li>Tap your Wood pile to flip up to three cards. Play the exposed card to uncover the next one in that group. You can wait for a match or flip again. When the stock runs out, the unplayed Wood cards are shuffled for the next pass.</li>
+      <li>Drag a face-up card onto the table to play it on the nearest eligible pile. You can also tap a 1 to open a pile. When you play one of your three face-up cards, the top Blitz card fills its spot. Emptying Blitz ends the round.</li>
+      <li>Tap your Wood pile to flip three cards when enough remain. Play the exposed card to uncover the next one. You can wait for a match or flip again. The unplayed Wood cards are shuffled as soon as the stock runs out.</li>
       <li>Score one point per card played to the table and lose two points per card left in Blitz. A game adds up scores over its chosen rounds. Free Play scores each round on its own.</li>
     </ul>
   </dialog>
@@ -220,14 +220,18 @@
   </template>
   <template id="seat-template">
     <section class="seat">
-      <div class="seat-heading"><strong class="seat-name"></strong><span class="seat-score"></span></div>
+      <div class="seat-heading">
+        <strong class="seat-name"></strong><span class="seat-score"></span>
+        <div class="seat-stress" hidden><meter min="0" max="100" value="0" aria-label="Rival stress"></meter><span>Stress <strong>0</strong></span></div>
+      </div>
+      <span class="seat-bubble" role="status" hidden></span>
       <div class="seat-cards">
         <div class="seat-zone wood-zone">
           <div class="wood-cards">
             <button class="card-slot wood-deck" type="button"></button>
             <button class="card-slot play-card wood-up" data-source="wood" type="button"></button>
           </div>
-          <span class="zone-label">Wood <strong class="wood-count"></strong></span>
+          <span class="zone-label wood-label">Wood <strong class="wood-count"></strong></span>
         </div>
         <div class="seat-zone post-zone">
           <div class="posts">

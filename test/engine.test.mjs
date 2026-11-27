@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   SUITS, DECK_TOOLS, TOTAL, DEFAULT_RULES, NEW_PILE, WOOD_CARD, newRace, accepts,
-  destinations, legalMoves, visibleCard, flipWood, woodCount, isBlocked, play, score, chooseMove, reactionTime,
+  destinations, legalMoves, visibleCard, flipWood, woodCount, isBlocked, play, score,
 } from '../public/engine.js';
 
 let nextId = 0;
@@ -101,10 +101,10 @@ test('Wood keeps skipped cards out of the stock and reshuffles only the unplayed
   assert.deepEqual(player.wood, batch.slice(3));
   assert.deepEqual(flipWood(state, 0), batch.slice(3, 6));
   assert.equal(play(state, 0, WOOD_CARD, NEW_PILE, batch[5].id), batch[5]);
-  assert.deepEqual(flipWood(state, 0), [batch[6]]);
-  assert.equal(player.wood.length, 0);
-  assert.equal(player.woodDiscard.length, 5);
-  assert.equal(flipWood(state, 0).length, 3);
+  const crossing = flipWood(state, 0);
+  assert.equal(crossing.length, 3);
+  assert.equal(crossing[0], batch[6]);
+  assert.equal(player.wood.length, 3);
   assert.equal(player.woodDiscard.length, 0);
   assert.deepEqual(new Set(woodCards(player)), new Set(batch.filter(item => item !== batch[5])));
 });
@@ -153,8 +153,8 @@ test('seeded rounds conserve cards across all decks, Wood passes, and shared pil
       for (let turn = 0; turn < 750 && state.finisher === null; turn++) {
         const index = turn % count;
         const player = state.players[index];
-        const move = index === 0 ? legalMoves(player, state.piles, state.rules)[0] : chooseMove(state, index, 'quick');
-        if (move && !move.flip) {
+        const move = legalMoves(player, state.piles, state.rules)[0];
+        if (move) {
           assert.ok(play(state, index, move.source, move.pile, visibleCard(player, move.source).id));
         } else if (woodCount(player)) {
           assert.ok(flipWood(state, index));
@@ -167,5 +167,4 @@ test('seeded rounds conserve cards across all decks, Wood passes, and shared pil
       assert.equal(new Set(all.map(item => item.id)).size, all.length);
     }
   }
-  assert.ok(reactionTime(1, 'expert', 1, () => .5) < reactionTime(1, 'relaxed', 1, () => .5));
 });
