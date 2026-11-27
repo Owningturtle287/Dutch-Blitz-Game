@@ -199,7 +199,10 @@
 
   <template id="card-template">
     <span class="card-face" aria-hidden="true">
-      <svg class="card-ornament" viewBox="0 0 100 140" focusable="false"><use href="./assets/card-art.svg#face" /></svg>
+      <svg class="card-ornament" viewBox="0 0 100 140" focusable="false">
+        <use href="./assets/card-art.svg#face" />
+        <use class="card-figures" />
+      </svg>
       <span class="card-rank"></span>
       <span class="card-corner"></span>
     </span>

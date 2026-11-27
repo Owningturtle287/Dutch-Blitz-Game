@@ -16,6 +16,7 @@ const seatTemplate = $('#seat-template').content.firstElementChild;
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const scheme = matchMedia('(display-mode: standalone)');
 const colors = { spark: 'Yellow', tide: 'Blue', ember: 'Red', grove: 'Green' };
+const cornerArt = { spark: 'girl-corners', tide: 'boy-corners', ember: 'boy-corners', grove: 'girl-corners' };
 const toolNames = { wagon: 'wagon', pump: 'hand pump', barrel: 'barrel', plow: 'plow' };
 const seating = [
   { name: 'You', side: 'south' },
@@ -74,6 +75,7 @@ function formatTime(milliseconds) {
 function cardFace(card) {
   const face = cardTemplate.cloneNode(true);
   face.classList.add(`suit-${card.suit}`);
+  face.querySelector('.card-figures').setAttribute('href', `./assets/card-art.svg#${cornerArt[card.suit]}`);
   face.querySelector('.card-rank').textContent = card.rank;
   face.querySelector('.card-corner').textContent = card.rank;
   return face;
