@@ -6,10 +6,11 @@
   <meta name="theme-color" content="#faf8ef">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="description" content="A real-time card race. Build shared piles and clear your deck first.">
+  <meta name="description" content="A real-time card race. Build shared piles and empty your Blitz pile.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./assets/icon-192.png">
   <link rel="apple-touch-icon" href="./assets/icon-192.png">
+  <link rel="preload" as="image" href="./assets/card-hand.webp">
   <link rel="stylesheet" href="./style.css">
   <title>Overcurrent</title>
 </head>
@@ -20,6 +21,7 @@
       <nav aria-label="Game controls">
         <button class="ghost pause" id="pause" type="button" hidden>Pause</button>
         <button class="ghost" id="install" type="button">Install <span aria-hidden="true">↗</span></button>
+        <button class="ghost" id="settings" type="button">Settings</button>
         <button class="ghost" id="help" type="button" aria-label="How to play">Rules <span aria-hidden="true">?</span></button>
       </nav>
     </header>
@@ -30,8 +32,8 @@
           <div class="art-orbit"></div>
         </div>
         <div class="lobby-copy">
-          <h1 id="lobby-title">Clear<br> your deck<span>.</span></h1>
-          <p>Race the table in real time. Play all 40 cards before your rivals do.</p>
+          <h1 id="lobby-title">Call<br> Blitz<span>.</span></h1>
+          <p>Race to empty your Blitz pile. Build shared piles in order and color.</p>
           <form id="setup">
             <fieldset>
               <legend>Opponents</legend>
@@ -49,7 +51,7 @@
                 <label><input type="radio" name="difficulty" value="expert"><span>Expert</span></label>
               </div>
             </fieldset>
-            <button class="primary start" type="submit">Start race <span aria-hidden="true">→</span></button>
+            <button class="primary start" type="submit">Start round <span aria-hidden="true">→</span></button>
           </form>
         </div>
       </section>
@@ -63,21 +65,13 @@
           </div>
           <button type="button" class="new-pile" id="new-pile" data-pile="-1"><span aria-hidden="true">+</span> New pile</button>
           <div class="piles" id="piles"></div>
+          <p class="empty-table" id="empty-table" hidden>Play a 1 to open a pile.</p>
+          <div class="round-countdown" id="countdown" role="timer" aria-label="Time until the round starts" hidden>
+            <span>Starting in</span>
+            <strong id="countdown-value">10</strong>
+          </div>
           <p class="status" id="status" role="status"></p>
-          <div class="rivals" id="rivals" role="group" aria-label="Opponents"></div>
-          <section class="player" aria-labelledby="hand-title">
-            <div class="seat-heading">
-              <span class="draw-deck" id="draw-deck" role="img"></span>
-              <div><h2 id="hand-title">Your hand</h2><span class="hand-count" id="remaining"></span></div>
-            </div>
-            <div class="hand" id="hand">
-              <button class="hand-card" type="button" data-slot="0"></button>
-              <button class="hand-card" type="button" data-slot="1"></button>
-              <button class="hand-card" type="button" data-slot="2"></button>
-              <button class="hand-card" type="button" data-slot="3"></button>
-            </div>
-            <button type="button" class="cycle" id="cycle"><span aria-hidden="true">↻</span> Swap card</button>
-          </section>
+          <div id="seats" class="seats"></div>
         </section>
       </section>
     </main>
@@ -85,17 +79,25 @@
 
   <dialog id="rules-dialog" aria-labelledby="rules-title">
     <form method="dialog" class="dialog-top"><h2 id="rules-title">How to race</h2><button class="close" aria-label="Close rules">×</button></form>
-    <p>Everyone plays at once. You start with <strong>4 cards in hand</strong> and 36 in your deck. Every play draws a replacement while your deck has cards. The first racer to play all <strong>40 cards</strong> wins.</p>
-    <p>The table starts with three shared piles. The rule shown on each pile tells you what can go on top.</p>
-    <dl class="rule-list">
-      <div><dt><span>↑</span> Rise</dt><dd>Play one number higher in any color. After 10 comes 1.</dd></div>
-      <div><dt><span>＝</span> Match</dt><dd>Play the same color. Any number works.</dd></div>
-      <div><dt><span>↓</span> Fall</dt><dd>Play one number lower in any color. After 1 comes 10.</dd></div>
-    </dl>
-    <p>Tap a highlighted card to play it. If it fits in several places, tap a highlighted pile. You can also drag a card to its destination.</p>
-    <p>Play a <strong>1</strong> on <strong>New pile</strong> to start another shared pile. New piles cycle through Rise, Match, and Fall.</p>
-    <p><strong>Swap card</strong> sends a card to the bottom of your deck and draws the next one. If no card is selected, the game swaps a blocked card first. When everyone is blocked, the pile tops reset and each pile keeps its rule.</p>
+    <p>Each player starts with 27 cards in the Wood pile, three face-up cards, and 10 cards in the Blitz pile. After the 10-second countdown, everyone plays at once.</p>
+    <ul class="rule-list">
+      <li>Play a <strong>1</strong> to open a shared pile. By default, each next card must be one number higher and the same color. A 10 played on a 9 goes face down and closes the pile.</li>
+      <li>Tap or drag one of your three face-up cards. The top Blitz card fills the space it leaves. Playing the last Blitz card into that space ends the round.</li>
+      <li>Tap your Wood pile to flip up to three cards. Play the exposed card to uncover the next one in that group. You can wait for a match or flip again. When the stock runs out, the unplayed Wood cards are shuffled for the next pass.</li>
+      <li>Score one point per card you played to the table and lose two points per card left in your Blitz pile.</li>
+    </ul>
     <p class="credits">Suit icons by <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer">Lucide</a> under the <a href="./assets/LUCIDE-LICENSE.txt">ISC license</a>.</p>
+  </dialog>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form method="dialog" class="dialog-top"><h2 id="settings-title">Round settings</h2><button class="close" aria-label="Close settings">×</button></form>
+    <p>These optional rules apply from the next round.</p>
+    <form method="dialog" id="variant-settings">
+      <label><input type="checkbox" name="anyColor"><span><strong>Any-color runs</strong><small>Consecutive numbers can change color.</small></span></label>
+      <label><input type="checkbox" name="sameColor"><span><strong>Same-color matches</strong><small>Allow any number if the color matches.</small></span></label>
+      <label><input type="checkbox" name="descending"><span><strong>Descending plays</strong><small>Also allow a card one number lower.</small></span></label>
+      <button class="primary full" type="submit">Save settings</button>
+    </form>
   </dialog>
 
   <dialog id="install-dialog" aria-labelledby="install-title">
@@ -108,6 +110,7 @@
   <dialog id="pause-dialog" aria-labelledby="pause-title">
     <div class="dialog-top"><h2 id="pause-title">Race paused</h2></div>
     <button class="primary full" id="resume" type="button">Resume race <span aria-hidden="true">→</span></button>
+    <button class="ghost full" id="restart" type="button">Restart round</button>
     <button class="ghost full" id="exit" type="button">Back to setup</button>
   </dialog>
 
@@ -115,7 +118,7 @@
     <div class="dialog-top"><h2 id="finish-title"></h2></div>
     <p id="finish-summary"></p>
     <ol id="standings" class="standings"></ol>
-    <button class="primary full" id="rematch" type="button">Race again <span aria-hidden="true">→</span></button>
+    <button class="primary full" id="rematch" type="button">Next round <span aria-hidden="true">→</span></button>
     <button class="ghost full" id="setup-again" type="button">Change setup</button>
   </dialog>
 
@@ -134,10 +137,35 @@
   </template>
   <template id="pile-template">
     <button class="pile" type="button">
-      <span class="pile-kind" aria-hidden="true"></span>
-      <span class="pile-card"></span>
-      <span class="pile-rule" aria-hidden="true"></span><span class="pile-cue" aria-hidden="true"></span>
+      <span class="pile-card" aria-hidden="true"></span>
+      <span class="pile-cue" aria-hidden="true"></span>
     </button>
+  </template>
+  <template id="seat-template">
+    <section class="seat">
+      <div class="seat-heading"><strong class="seat-name"></strong><span class="seat-score"></span></div>
+      <div class="seat-cards">
+        <div class="seat-zone wood-zone">
+          <div class="wood-cards">
+            <button class="card-slot wood-deck" type="button"></button>
+            <button class="card-slot play-card wood-up" data-source="wood" type="button"></button>
+          </div>
+          <span class="zone-label">Wood <strong class="wood-count"></strong></span>
+        </div>
+        <div class="seat-zone post-zone">
+          <div class="posts">
+            <button class="card-slot play-card" data-source="0" type="button"></button>
+            <button class="card-slot play-card" data-source="1" type="button"></button>
+            <button class="card-slot play-card" data-source="2" type="button"></button>
+          </div>
+          <span class="zone-label">Face-up</span>
+        </div>
+        <div class="seat-zone blitz-zone">
+          <span class="card-slot blitz-deck" role="img"></span>
+          <span class="zone-label">Blitz <strong class="blitz-count"></strong></span>
+        </div>
+      </div>
+    </section>
   </template>
   <script type="module" src="./main.js"></script>
 </body>

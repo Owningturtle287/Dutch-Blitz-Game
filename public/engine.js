@@ -2,14 +2,14 @@ export const SUITS = ['spark', 'tide', 'ember', 'grove'];
 export const DECK_TOOLS = ['wagon', 'pump', 'barrel', 'plow'];
 export const RANKS = 10;
 export const TOTAL = SUITS.length * RANKS;
-export const RULES = ['rise', 'match', 'fall'];
+export const BLITZ_SIZE = 10;
+export const POST_SIZE = 3;
+export const DRAW_SIZE = 3;
 export const NEW_PILE = -1;
+export const WOOD_CARD = 'wood';
 export const OPEN_RANK = 1;
-export const HAND_SIZE = 4;
-export const RECYCLE_DELAY = 850;
+export const DEFAULT_RULES = Object.freeze({ anyColor: false, sameColor: false, descending: false });
 
-const rankAfter = (rank, change) => (rank - 1 + change + RANKS) % RANKS + 1;
-const rankStep = rule => rule === 'rise' ? 1 : -1;
 const sample = (list, random) => list[Math.floor(random() * list.length)];
 
 export function shuffled(items, random) {
@@ -21,156 +21,127 @@ export function shuffled(items, random) {
   return result;
 }
 
-export function nextRank({ rule, top }) {
-  return rankAfter(top.rank, rankStep(rule));
-}
-
-export function accepts(pile, card) {
-  if (!card) return false;
-  if (pile.rule === 'match') return card.suit === pile.top.suit;
-  return card.rank === nextRank(pile);
-}
-
-export function destinations(card, piles) {
-  if (!card) return [];
-  const targets = piles.flatMap((pile, index) => accepts(pile, card) ? [index] : []);
-  if (card.rank === OPEN_RANK) targets.push(NEW_PILE);
-  return targets;
-}
-
-export function legalMoves(hand, piles) {
-  return hand.flatMap((card, slot) => destinations(card, piles).map(pile => ({ slot, pile })));
-}
-
-function tunePiles(state, rules) {
-  const anchor = sample(state.players.flatMap(player => player.hand.filter(Boolean)), state.random);
-  const piles = rules.map(rule => ({ rule, top: {
-    suit: sample(SUITS, state.random), rank: Math.floor(state.random() * RANKS) + 1,
-  } }));
-  const { rule, top } = sample(piles, state.random);
-  if (rule === 'match') top.suit = anchor.suit;
-  else top.rank = rankAfter(anchor.rank, -rankStep(rule));
-  return piles;
-}
-
-function placeCard(piles, destination, card) {
-  if (destination === NEW_PILE) {
-    piles.push({ rule: RULES[piles.length % RULES.length], top: card });
-  } else {
-    piles[destination] = { rule: piles[destination].rule, top: card };
-  }
-}
-
-export function newRace(count, random = Math.random) {
+export function newRace(count, random = Math.random, rules = DEFAULT_RULES) {
   if (!Number.isInteger(count) || count < 2 || count > DECK_TOOLS.length) throw new RangeError('Choose 2–4 racers');
   const tools = shuffled(DECK_TOOLS, random).slice(0, count);
   const players = tools.map((tool, player) => {
     const pack = SUITS.flatMap(suit => Array.from({ length: RANKS }, (_, index) => ({
       id: `${player}-${suit}-${index + 1}`, suit, rank: index + 1, tool,
     })));
-    const deck = shuffled(pack, random);
-    return { tool, hand: deck.splice(0, HAND_SIZE), deck, played: 0, recycleAt: 0 };
+    const wood = shuffled(pack, random);
+    const blitz = wood.splice(0, BLITZ_SIZE);
+    const posts = wood.splice(0, POST_SIZE);
+    return { tool, blitz, posts, wood, woodShown: [], woodDiscard: [], played: 0 };
   });
-  const state = { players, random, winner: null, turns: 0, retunes: 0 };
-  state.piles = tunePiles(state, RULES);
-  return state;
+  return { players, random, rules: { ...DEFAULT_RULES, ...rules }, piles: [], finisher: null };
 }
 
-export function play(state, playerIndex, slot, destination, expectedCard) {
-  if (state.winner !== null || !Number.isInteger(destination)) return null;
-  const player = state.players[playerIndex];
-  const card = player?.hand[slot];
-  if (!card || card.id !== expectedCard) return null;
-  const pile = state.piles[destination];
-  const valid = destination === NEW_PILE ? card.rank === OPEN_RANK : pile && accepts(pile, card);
-  if (!valid) return null;
+export function visibleCard(player, source) {
+  return source === WOOD_CARD ? player.woodShown.at(-1) : player.posts[source];
+}
 
-  player.hand[slot] = player.deck.shift() ?? null;
+export function accepts(pile, card, rules = DEFAULT_RULES) {
+  if (!card || pile.closed) return false;
+  const top = pile.cards.at(-1);
+  const colorMatches = card.suit === top.suit;
+  const difference = card.rank - top.rank;
+  return (rules.sameColor && colorMatches) ||
+    ((colorMatches || rules.anyColor) && (difference === 1 || (rules.descending && difference === -1)));
+}
+
+export function destinations(card, piles, rules = DEFAULT_RULES) {
+  if (!card) return [];
+  const targets = piles.flatMap((pile, index) => accepts(pile, card, rules) ? [index] : []);
+  if (card.rank === OPEN_RANK) targets.push(NEW_PILE);
+  return targets;
+}
+
+export function legalMoves(player, piles, rules = DEFAULT_RULES) {
+  const sources = [...player.posts.keys(), WOOD_CARD];
+  return sources.flatMap(source => destinations(visibleCard(player, source), piles, rules).map(pile => ({ source, pile })));
+}
+
+export function woodCount(player) {
+  return player.wood.length + player.woodShown.length + player.woodDiscard.length;
+}
+
+export function isBlocked(state) {
+  return state.players.every(({ posts, wood, woodShown, woodDiscard }) =>
+    ![...posts, ...wood, ...woodShown, ...woodDiscard].some(card =>
+      card && (card.rank === OPEN_RANK || state.piles.some(pile => accepts(pile, card, state.rules)))));
+}
+
+export function flipWood(state, playerIndex) {
+  const player = state.players[playerIndex];
+  if (state.finisher !== null || !player || !woodCount(player)) return null;
+
+  player.woodDiscard.push(...player.woodShown);
+  if (!player.wood.length) {
+    player.wood = shuffled(player.woodDiscard, state.random);
+    player.woodDiscard = [];
+  }
+  player.woodShown = player.wood.splice(0, DRAW_SIZE);
+  return player.woodShown;
+}
+
+export function play(state, playerIndex, source, destination, expectedCard) {
+  if (state.finisher !== null || !Number.isInteger(destination)) return null;
+  const player = state.players[playerIndex];
+  if (!player || (source !== WOOD_CARD && (!Number.isInteger(source) || source < 0 || source >= POST_SIZE))) return null;
+  const card = visibleCard(player, source);
+  if (!card || card.id !== expectedCard) return null;
+
+  const pile = state.piles[destination];
+  if (destination === NEW_PILE) {
+    if (card.rank !== OPEN_RANK) return null;
+    state.piles.push({ cards: [card], closed: false });
+  } else {
+    if (!pile || !accepts(pile, card, state.rules)) return null;
+    pile.closed = pile.cards.at(-1).rank === RANKS - 1 && card.rank === RANKS;
+    pile.cards.push(card);
+  }
+
   player.played++;
-  placeCard(state.piles, destination, card);
-  state.turns++;
-  if (player.played === TOTAL) state.winner = playerIndex;
+  if (source === WOOD_CARD) {
+    player.woodShown.pop();
+  } else {
+    player.posts[source] = player.blitz.pop() ?? null;
+    if (!player.blitz.length) state.finisher = playerIndex;
+  }
   return card;
 }
 
-export function recycle(state, playerIndex, slot, now) {
-  const player = state.players[playerIndex];
-  if (state.winner !== null || !player?.deck.length || !player.hand[slot] || now < player.recycleAt) return false;
-  const previous = player.hand[slot];
-  player.hand[slot] = player.deck.shift();
-  player.deck.push(previous);
-  player.recycleAt = now + RECYCLE_DELAY;
-  return true;
-}
-
-export function retuneIfBlocked(state) {
-  if (state.winner !== null || state.players.some(player => legalMoves(player.hand, state.piles).length)) return false;
-  state.piles = tunePiles(state, state.piles.map(pile => pile.rule));
-  state.retunes++;
-  return true;
+export function score(player) {
+  return player.played - 2 * player.blitz.length;
 }
 
 const PROFILES = [
-  { reaction: 660, variation: 470, oversight: 0.10, hesitation: 0.11, bias: 1.15 },
-  { reaction: 570, variation: 630, oversight: 0.15, hesitation: 0.07, bias: 0.90 },
-  { reaction: 620, variation: 530, oversight: 0.08, hesitation: 0.16, bias: 1.05 },
+  { reaction: 680, variation: 460, oversight: .10, hesitation: .11 },
+  { reaction: 610, variation: 580, oversight: .15, hesitation: .07 },
+  { reaction: 650, variation: 500, oversight: .08, hesitation: .16 },
 ];
 
 const DIFFICULTIES = {
   relaxed: { pace: 1.68, error: 1.45 },
   quick: { pace: 1, error: 1 },
-  expert: { pace: 0.65, error: 0.60 },
+  expert: { pace: .65, error: .60 },
 };
 
 export function reactionTime(playerIndex, difficulty, rhythm, random = Math.random) {
   const profile = PROFILES[playerIndex - 1];
   const settings = DIFFICULTIES[difficulty];
-  const jitter = (random() - 0.5) * profile.variation;
+  const jitter = (random() - .5) * profile.variation;
   const hesitation = random() < profile.hesitation * settings.error ? 300 + random() * 600 : 0;
   return Math.max(170, (profile.reaction + jitter + hesitation) * settings.pace * rhythm);
 }
 
-function project(hand, piles, move) {
-  const nextHand = [...hand];
-  const nextPiles = [...piles];
-  placeCard(nextPiles, move.pile, nextHand[move.slot]);
-  nextHand[move.slot] = null;
-  return { hand: nextHand, piles: nextPiles };
-}
-
-function continuationScore(hand, piles) {
-  const chances = legalMoves(hand, piles);
-  const options = new Set(chances.map(move => move.slot)).size;
-  const chain = chances.some(move => {
-    const next = project(hand, piles, move);
-    return legalMoves(next.hand, next.piles).length > 0;
-  });
-  return options * 2 + Math.min(chances.length, 8) * 0.3 + (chain ? 1.6 : 0);
-}
-
-export function recycleSlot(hand, piles) {
-  const blocked = hand.findIndex(card => card && !destinations(card, piles).length);
-  return blocked >= 0 ? blocked : hand.findIndex(Boolean);
-}
-
 export function chooseMove(state, playerIndex, difficulty, random = state.random) {
-  const { hand, deck } = state.players[playerIndex];
-  const { piles } = state;
-  const moves = legalMoves(hand, piles);
-  if (!moves.length) return deck.length ? { recycle: recycleSlot(hand, piles) } : null;
+  if (state.finisher !== null) return null;
+  const player = state.players[playerIndex];
+  const moves = legalMoves(player, state.piles, state.rules);
+  if (!moves.length) return woodCount(player) ? { flip: true } : null;
+  if (random() < PROFILES[playerIndex - 1].oversight * DIFFICULTIES[difficulty].error) return sample(moves, random);
 
-  const profile = PROFILES[playerIndex - 1];
-  if (random() < profile.oversight * DIFFICULTIES[difficulty].error) {
-    return random() < 0.22 && deck.length ? { recycle: recycleSlot(hand, piles) } : sample(moves, random);
-  }
-
-  const ranked = moves.map(move => {
-    const next = project(hand, piles, move);
-    const scarcity = 1 / destinations(hand[move.slot], piles).length;
-    const openCost = move.pile === NEW_PILE ? 0.6 : 0;
-    const score = continuationScore(next.hand, next.piles) * profile.bias + scarcity - openCost + random() * 0.65;
-    return { move, score };
-  });
-  ranked.sort((a, b) => b.score - a.score);
-  return ranked[0].move;
+  const posts = moves.filter(move => move.source !== WOOD_CARD);
+  return sample(posts.length ? posts : moves, random);
 }
