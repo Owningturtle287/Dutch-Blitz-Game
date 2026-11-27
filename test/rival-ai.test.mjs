@@ -82,30 +82,31 @@ test('unsuccessful Wood, slow Blitz progress and contested moves raise visible s
     if (stepRival(rival, race, clock)?.kind === 'flip') flipWood(race, 1);
   }
   assert.ok(rival.dryFlips > 3);
-  assert.ok(rival.stress > 30 && rival.stress <= 100);
+  assert.ok(rival.stress > 12 && rival.stress < 50);
 
   rival.stress = 78;
   rival.spokeAt = -Infinity;
   rival.focus = { kind: 'play', pile: 0, source: 0 };
   noticePileChange(rival, 0, 0, 25000);
   assert.ok(rival.focus.contested);
-  assert.equal(rival.stress, 85.5);
-  assert.ok(rival.speech.text);
+  assert.equal(rival.stress, 82.1);
+  assert.match(rival.speech.text, /Shit|Goddammit|I had that/);
   noticePileChange(rival, 0, 0, 25010);
-  assert.equal(rival.stress, 85.5);
+  assert.equal(rival.stress, 82.1);
   settleRivalPlay(rival, { source: 0, pile: 0 }, true, false, 25500);
-  assert.equal(rival.stress, 79.5);
+  assert.equal(rival.stress, 75.1);
   assert.equal(rival.lastBlitz, 25500);
 });
 
-test('high stress can produce a wrong-pile attempt after a slower decision', () => {
-  const { race, rival } = setup([stack(card(5)), stack(card(5, 'ember'))]);
-  rival.pileCount = 2;
+test('ordinary slips stay close in rank and in the correct color', () => {
+  const { race, rival } = setup([stack(card(5)), stack(card(4)), stack(card(5, 'ember'))]);
+  rival.pileCount = 3;
   rival.posts = [];
   rival.cards.set(0, card(6));
   rival.piles.set(0, card(5));
-  rival.piles.set(1, card(5, 'ember'));
-  rival.random = () => .2;
+  rival.piles.set(1, card(4));
+  rival.piles.set(2, card(5, 'ember'));
+  rival.random = () => .028;
 
   stepRival(rival, race, 0);
   assert.equal(rival.focus.pile, 0);
@@ -118,6 +119,26 @@ test('high stress can produce a wrong-pile attempt after a slower decision', () 
   assert.equal(rival.focus.pile, 1);
   assert.ok(rival.next > calmDelay);
   assert.equal(race.piles[1].cards.length, 1);
+});
+
+test('even at maximum stress mismatched colors need a very rare roll', () => {
+  const { race, rival } = setup([stack(card(5)), stack(card(5, 'ember')), stack(card(2, 'ember'))]);
+  rival.pileCount = 3;
+  rival.posts = [];
+  rival.cards.set(0, card(6));
+  rival.piles.set(0, card(5));
+  rival.piles.set(1, card(5, 'ember'));
+  rival.piles.set(2, card(2, 'ember'));
+  rival.stress = 100;
+  rival.random = () => .005;
+  stepRival(rival, race, 0);
+  assert.equal(rival.focus.pile, 0);
+  rival.focus = null;
+  rival.next = 0;
+  rival.random = () => .002;
+  stepRival(rival, race, 0);
+  assert.equal(rival.focus.pile, 1);
+  assert.equal(rival.focus.mistake, true);
 });
 
 test('there are hundreds of unique names and a new roster can exclude the old one', () => {

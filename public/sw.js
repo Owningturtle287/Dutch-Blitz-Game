@@ -2,9 +2,11 @@ const scope = self.registration.scope;
 const CACHE_PREFIX = `overcurrent:${scope}:`;
 const CACHE = `${CACHE_PREFIX}local-v1`;
 const APP_FILES = [
-  './', './index.html', './style.css', './engine.js', './main.js', './match.js', './profiles.js', './tally.js', './rival-ai.js', './rival-names.js', './manifest.webmanifest',
+  './', './index.html', './style.css', './engine.js', './main.js', './match.js', './profiles.js', './tally.js', './rival-ai.js', './rival-names.js', './sound.js', './manifest.webmanifest',
   './assets/card-art.svg', './assets/walnut-table.webp', './assets/card-hand.webp',
   './assets/icon-192.png', './assets/icon-512.png',
+  './assets/audio/fan.mp3', './assets/audio/flip-1.mp3', './assets/audio/flip-2.mp3',
+  './assets/audio/place-1.mp3', './assets/audio/place-2.mp3', './assets/audio/place-3.mp3', './assets/audio/shuffle.mp3',
 ];
 const appUrls = new Set(APP_FILES.map(path => new URL(path, scope).href));
 

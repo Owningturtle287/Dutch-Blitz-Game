@@ -5,6 +5,7 @@ import {
 import { newMatch, recordRound, levelProgress } from './match.js';
 import { createProfileStore, normalizeName } from './profiles.js';
 import { showTally } from './tally.js';
+import { playSound, setSoundEnabled, unlockSounds } from './sound.js';
 import { newRival, noticePileChange, settleRivalPlay, stepRival } from './rival-ai.js';
 import { chooseRivalNames } from './rival-names.js';
 
@@ -27,6 +28,7 @@ const seating = [
   { side: 'east', angle: -90 },
 ];
 const ROUND_DELAY = 10000;
+const seatPan = [0, 0, -.38, .38];
 const BLITZ_HOLD = 1500;
 
 let race;
@@ -63,6 +65,10 @@ function browserStorage() {
 }
 
 const profiles = createProfileStore(browserStorage());
+let soundsOn = readSetting('sound', true) !== false;
+setSoundEnabled(soundsOn);
+document.addEventListener('pointerdown', unlockSounds, { capture: true, passive: true });
+document.addEventListener('keydown', unlockSounds, { capture: true });
 const racerName = index => index === 0 ? match.settings.name : match.rivalNames[index - 1];
 const cardName = card => `${colors[card.suit]} ${card.rank}`;
 const timeNow = () => elapsed + (startedAt === null ? 0 : performance.now() - startedAt);
@@ -203,7 +209,8 @@ function createSeats() {
     }
     return {
       element, slots, stock, blitz, angle, stress, meter,
-      stressValue: stress.querySelector('strong'), bubble: element.querySelector('.seat-bubble'), looking: null,
+      stressValue: stress.querySelector('strong'), bubble: element.querySelector('.seat-bubble'),
+      bubbleText: '', bubbleAnimation: null, looking: null,
       points: element.querySelector('.seat-score'),
       woodCount: element.querySelector('.wood-count'),
       blitzCount: element.querySelector('.blitz-count'),
@@ -400,11 +407,19 @@ function applyPlay(player, source, destination, cardId, from) {
   const pile = race.piles[index];
   const target = pileGrid.children[index].querySelector('.pile-card').lastElementChild;
   const duration = 350;
+  const landing = motion.matches ? 0 : 294;
+  const pan = seatPan[player];
+  playSound('place', { level: player === 0 ? .88 : .48, delay: landing, pan });
   carryCard(pile.closed ? turningCard(card, false) : cardFace(card), origin, target.getBoundingClientRect(), { duration, fromAngle: seat.angle });
   revealOnArrival(target, duration);
   if (source !== WOOD_CARD) {
     const replacement = visibleCard(race.players[player], source);
-    if (replacement) revealTransfer(replacement, blitzOrigin, seat.slots.get(source), { delay: 135, angle: seat.angle });
+    if (replacement) {
+      revealTransfer(replacement, blitzOrigin, seat.slots.get(source), { delay: 135, angle: seat.angle });
+      playSound('flip', { level: player === 0 ? .54 : .26, delay: motion.matches ? 75 : 185, pan });
+    }
+  } else if (visibleCard(race.players[player], WOOD_CARD)) {
+    playSound('flip', { level: player === 0 ? .52 : .24, delay: landing + 55, pan });
   }
   if (race.finisher !== null) finishRace();
   return true;
@@ -417,6 +432,10 @@ function turnWood(player) {
   const reshuffled = racer.wood.length < Math.min(DRAW_SIZE, woodCount(racer));
   const drawn = flipWood(race, player);
   if (!drawn) return;
+  const volume = player === 0 ? .67 : .28;
+  const pan = seatPan[player];
+  if (reshuffled) playSound('shuffle', { level: volume * .63, pan });
+  playSound(drawn.length > 1 ? 'fan' : 'flip', { level: volume, delay: reshuffled ? 90 : 0, pan });
   if (player === 0) {
     if (drag?.source === WOOD_CARD) cancelDrag();
     selected = null;
@@ -433,10 +452,37 @@ function turnWood(player) {
 }
 
 function showBubble(seat, text = '', blitz = false) {
-  const bubble = seat.bubble;
-  if (bubble.textContent !== text) bubble.textContent = text;
-  bubble.hidden = !text;
-  bubble.classList.toggle('blitz-call', blitz);
+  if (seat.bubbleText === text) return;
+  const { bubble } = seat;
+  seat.bubbleText = text;
+  seat.bubbleAnimation?.cancel();
+
+  if (text) {
+    bubble.classList.toggle('blitz-call', blitz);
+    bubble.textContent = text;
+    bubble.hidden = false;
+    if (motion.matches) return;
+    seat.bubbleAnimation = bubble.animate([
+      { opacity: 0, translate: '0 5px', scale: .92 },
+      { opacity: 1, translate: '0 -1px', scale: 1.015, offset: .73 },
+      { opacity: 1, translate: '0 0', scale: 1 },
+    ], { duration: 245, easing: 'cubic-bezier(.18,.72,.32,1)' });
+  } else if (motion.matches) {
+    bubble.hidden = true;
+    bubble.textContent = '';
+  } else {
+    const dismiss = bubble.animate([
+      { opacity: 1, translate: '0 0' },
+      { opacity: 0, translate: '0 -4px' },
+    ], { duration: 165, easing: 'ease-out', fill: 'forwards' });
+    seat.bubbleAnimation = dismiss;
+    dismiss.finished.then(() => {
+      if (seat.bubbleAnimation !== dismiss) return;
+      bubble.hidden = true;
+      bubble.textContent = '';
+      dismiss.cancel();
+    }, () => {});
+  }
 }
 
 function renderRivals() {
@@ -474,6 +520,7 @@ function rivalMiss(bot, move) {
   const source = seat.slots.get(move.source);
   const target = pile.querySelector('.pile-card');
   const duration = 560;
+  playSound('flip', { level: .22, delay: motion.matches ? 0 : 245, pan: seatPan[bot.player] });
   carryCard(cardFace(card), slotRect(source), target.getBoundingClientRect(), { duration, fromAngle: seat.angle, returnCard: true });
   if (!motion.matches) {
     source.firstElementChild.animate([
@@ -759,6 +806,10 @@ const variantsForm = $('#variant-settings');
 variantsForm.addEventListener('submit', () => {
   for (const key of Object.keys(variants)) variants[key] = variantsForm.elements[key].checked;
   saveSetting('variants', variants);
+  soundsOn = variantsForm.elements.sound.checked;
+  saveSetting('sound', soundsOn);
+  setSoundEnabled(soundsOn);
+  unlockSounds();
 });
 
 const lobbyArt = $('.lobby-art');
@@ -859,6 +910,7 @@ setupForm.addEventListener('submit', event => {
   nameInput.value = profile.name;
   saveSetting('setup', settings);
   saveSetting('player-name', profile.name);
+  unlockSounds();
   beginMatch({ ...settings, name: profile.name });
 });
 
@@ -868,6 +920,7 @@ for (const button of [$('#help'), $('#lobby-rules')]) {
 for (const button of [$('#settings'), $('#lobby-settings')]) {
   button.addEventListener('click', () => {
     for (const [key, value] of Object.entries(variants)) variantsForm.elements[key].checked = value;
+    variantsForm.elements.sound.checked = soundsOn;
     showDialog($('#settings-dialog'));
   });
 }

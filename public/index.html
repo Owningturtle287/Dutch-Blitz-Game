@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="A real-time card race. Build shared piles and empty your Blitz pile.">
   <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./assets/icon-192.png">
-  <link rel="apple-touch-icon" href="./assets/icon-192.png">
+  <link rel="icon" href="./assets/icon-192.png?v=wagon">
+  <link rel="apple-touch-icon" href="./assets/icon-192.png?v=wagon">
   <link rel="preload" as="image" href="./assets/card-hand.webp">
   <link rel="stylesheet" href="./style.css">
   <title>Dutch Blitz</title>
@@ -131,6 +131,7 @@
       <label><input type="checkbox" name="anyColor"><span><strong>Any-color runs</strong><small>Consecutive numbers can change color.</small></span></label>
       <label><input type="checkbox" name="sameColor"><span><strong>Same-color matches</strong><small>Allow any number if the color matches.</small></span></label>
       <label><input type="checkbox" name="descending"><span><strong>Descending plays</strong><small>Also allow a card one number lower.</small></span></label>
+      <label><input type="checkbox" name="sound" checked><span><strong>Sound effects</strong><small>Card flips, placement, and shuffles.</small></span></label>
       <button class="primary full" type="submit">Save settings</button>
     </form>
   </dialog>
