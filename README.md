@@ -1,6 +1,6 @@
 # Overcurrent
 
-Overcurrent is a mobile-first, real-time card race for one player and up to three computer rivals. Clear a 40-card deck with ranks 1–10 in yellow, blue, red, and green. The table starts with three shared piles.
+Overcurrent is a mobile-first, real-time card race for one player and up to three computer rivals. Each racer gets a 40-card deck with ranks 1–10 in yellow, blue, red, and green. Each deck shows a wagon, hand pump, barrel, or plow on every card back. The table starts with three shared piles.
 
 | Pile | Rule |
 | --- | --- |

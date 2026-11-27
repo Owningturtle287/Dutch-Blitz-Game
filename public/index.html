@@ -73,7 +73,10 @@
         </section>
         <section class="player" aria-labelledby="hand-title">
           <div class="hand-heading">
-            <div><h2 id="hand-title">Your hand</h2><span class="hand-count" id="remaining"></span></div>
+            <div>
+              <span class="draw-deck" id="draw-deck" role="img"></span>
+              <h2 id="hand-title">Your hand</h2><span class="hand-count" id="remaining"></span>
+            </div>
             <button type="button" class="cycle" id="cycle"><span aria-hidden="true">↻</span> Swap card</button>
           </div>
           <div class="hand" id="hand">
@@ -89,7 +92,7 @@
 
   <dialog id="rules-dialog" aria-labelledby="rules-title">
     <form method="dialog" class="dialog-top"><h2 id="rules-title">How to race</h2><button class="close" aria-label="Close rules">×</button></form>
-    <p>Everyone plays at once. Clear all <strong>40 cards</strong> to win. Each deck has a 1 through 10 in yellow, blue, red, and green.</p>
+    <p>Everyone plays at once. Clear all <strong>40 cards</strong> to win. Each deck has a 1 through 10 in yellow, blue, red, and green, with one tool printed on every back.</p>
     <dl class="rule-list">
       <div><dt><span>↑</span> Rise</dt><dd>Play one number higher. After 10 comes 1.</dd></div>
       <div><dt><span>＝</span> Match</dt><dd>Play the same color. Any number works.</dd></div>
@@ -124,10 +127,15 @@
 
   <template id="card-template">
     <span class="card-face" aria-hidden="true">
-      <span class="card-trim"></span>
+      <svg class="card-ornament" viewBox="0 0 100 140" focusable="false"><use href="./assets/card-art.svg#face" /></svg>
       <span class="card-rank"></span>
-      <span class="card-emblem"><span class="suit-icon"></span></span>
+      <span class="suit-icon"></span>
       <span class="card-corner"></span>
+    </span>
+  </template>
+  <template id="back-template">
+    <span class="card-back" aria-hidden="true">
+      <svg viewBox="0 0 72 64" focusable="false"><use /></svg>
     </span>
   </template>
   <template id="pile-template"><button class="pile" type="button"><span class="pile-title"><span class="pile-order" aria-hidden="true"></span><span class="pile-kind" aria-hidden="true"></span></span><span class="pile-card"></span><span class="pile-rule"></span></button></template>

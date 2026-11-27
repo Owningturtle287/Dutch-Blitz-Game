@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <g id="sprig">
+      <path d="M12 33c8-2 12-8 12-17" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+      <path d="M24 18c-4-1-5-4-4-7 3 1 5 4 4 7Zm0 5c0-4 3-7 6-7-1 4-3 6-6 7Zm-2 4c-5-1-7-4-6-7 4 1 6 3 6 7Zm-2 3c3-4 6-4 9-3-3 3-6 4-9 3Z" fill="currentColor"/>
+      <circle cx="12.5" cy="23.5" r="1" fill="currentColor"/>
+    </g>
+    <g id="side-ornament" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linecap="round">
+      <path d="M12 54v7m0 18v7m0-20 2.4 4-2.4 4-2.4-4Z"/>
+      <path d="M12 61q-4-2-3-5m3 5q4-2 3-5m-3 23q-4 2-3 5m3-5q4 2 3 5"/>
+    </g>
+    <path id="rosette-leaf" d="M50 43c3.8 3 4.4 6.3 0 9.4-4.4-3.1-3.8-6.4 0-9.4Z" fill="currentColor"/>
+    <path id="rosette-diamond" d="m50 43 2 3.3-2 3.3-2-3.3Z" fill="currentColor"/>
+  </defs>
+
+  <symbol id="face" viewBox="0 0 100 140">
+    <use href="#sprig"/>
+    <use href="#sprig" transform="translate(100) scale(-1 1)"/>
+    <use href="#sprig" transform="rotate(180 50 70)"/>
+    <use href="#sprig" transform="translate(0 140) scale(1 -1)"/>
+    <use href="#side-ornament"/>
+    <use href="#side-ornament" transform="rotate(180 50 70)"/>
+    <circle cx="50" cy="70" r="32" fill="#fff8e7" stroke="currentColor" stroke-width="2.1"/>
+    <circle cx="50" cy="70" r="28.5" fill="none" stroke="currentColor" stroke-width=".75" stroke-dasharray=".7 1.7"/>
+    <circle cx="50" cy="70" r="15.6" fill="none" stroke="currentColor" stroke-width=".75"/>
+    <use href="#rosette-leaf"/>
+    <use href="#rosette-leaf" transform="rotate(90 50 70)"/>
+    <use href="#rosette-leaf" transform="rotate(180 50 70)"/>
+    <use href="#rosette-leaf" transform="rotate(270 50 70)"/>
+    <use href="#rosette-diamond" transform="rotate(45 50 70)"/>
+    <use href="#rosette-diamond" transform="rotate(135 50 70)"/>
+    <use href="#rosette-diamond" transform="rotate(225 50 70)"/>
+    <use href="#rosette-diamond" transform="rotate(315 50 70)"/>
+  </symbol>
+
+  <symbol id="wagon" viewBox="0 0 72 64">
+    <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 33h45l13 11M13 33V20l11-10h17l10 10v13M29 12v20M16 23h23"/>
+      <circle cx="19" cy="45" r="10"/>
+      <circle cx="47" cy="45" r="10"/>
+      <path d="M19 36v18m-9-9h18m19-9v18m-9-9h18" stroke-width="1.8"/>
+    </g>
+  </symbol>
+
+  <symbol id="pump" viewBox="0 0 72 64">
+    <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 51h48l4 5H8l4-5Zm19 0V16h13v35M28 16h19m-16 8H21l-4 5h-5v-6l7-5h12m13 2c9 0 13 4 15 11l3 8h5M27 12c0-4 5-6 10-6 6 0 10 2 10 6v4H27v-4Z"/>
+      <path d="M37 25v21m-21-9-2 4" stroke-width="1.8"/>
+    </g>
+  </symbol>
+
+  <symbol id="barrel" viewBox="0 0 72 64">
+    <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="36" cy="13" rx="19" ry="6"/>
+      <path d="M17 13q-7 20 0 38c4 8 34 8 38 0q7-18 0-38M14 25c5 8 39 8 44 0M13 43c6 8 40 8 46 0"/>
+      <path d="M25 19q-4 18 0 35m11-34v36m11-37q4 18 0 35" stroke-width="1.8"/>
+    </g>
+  </symbol>
+
+  <symbol id="plow" viewBox="0 0 72 64">
+    <g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 31c19-2 29-1 38 5M31 43c9-5 15-13 22-19 5-5 10-7 15-7m-26 8c6-6 11-12 20-14M27 37l-12 12 19 4 19-15-17-5-9 4Z"/>
+      <path d="M21 48c9-2 14-7 19-13m-5 17 13 2m-35 1 12 2" stroke-width="1.8"/>
+      <circle cx="6" cy="31" r="2.4" fill="#fff8e7"/>
+    </g>
+  </symbol>
+</svg>
