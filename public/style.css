@@ -144,7 +144,7 @@ dialog p.credits { font-size: .76rem; color: var(--muted); margin-top: 17px; }
   .lobby-art { min-height: 146px; height: 29vw; max-height: 210px; }
   .art-orbit { width: min(51%, 184px); }
   .lobby-art > .card-face { width: min(26%, 107px); }
-  .lobby h1 { font-size: clamp(2.7rem, 11vw, 4rem); }
+  .lobby h1 { font-size: clamp(2.7rem, 11vw, 4rem); letter-spacing: -.07em; }
   .lobby h1 br { display: none; }
   .lobby p { margin-top: 9px; max-width: 35ch; }
   .lobby form { margin-top: 17px; gap: 9px; width: 100%; }
@@ -155,6 +155,7 @@ dialog p.credits { font-size: .76rem; color: var(--muted); margin-top: 17px; }
   .rival { padding-inline: 5px; column-gap: 4px; }
   .rival-icon { width: 18px; height: 18px; }
   .ghost { padding-inline: 7px; }
+  .masthead nav span { display: none; }
 }
 
 @media (max-height: 650px) {
