@@ -20,8 +20,8 @@ const toolNames = { wagon: 'wagon', pump: 'hand pump', barrel: 'barrel', plow: '
 const seating = [
   { name: 'You', side: 'south' },
   { name: 'Sage', side: 'north' },
-  { name: 'Nova', side: 'west' },
-  { name: 'Dash', side: 'east' },
+  { name: 'Nova', side: 'west', angle: 90 },
+  { name: 'Dash', side: 'east', angle: -90 },
 ];
 const ROUND_DELAY = 10000;
 
@@ -117,27 +117,33 @@ function makeGrip() {
   return hand;
 }
 
-function carryCard(visual, from, to, { duration = 350, delay = 0 } = {}) {
+function carryCard(visual, from, to, { duration = 350, delay = 0, fromAngle = 0, toAngle = 0 } = {}) {
   if (motion.matches || !from?.width || !to?.width) return;
   const flight = document.createElement('div');
   flight.className = 'flight';
   flight.setAttribute('aria-hidden', 'true');
   const grip = makeGrip();
+  const width = toAngle ? to.height : to.width;
+  const height = toAngle ? to.width : to.height;
   Object.assign(flight.style, {
-    left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px`,
+    left: `${to.left + (to.width - width) / 2}px`, top: `${to.top + (to.height - height) / 2}px`,
+    width: `${width}px`, height: `${height}px`,
   });
   flight.append(visual, grip);
   document.body.append(flight);
   const x = from.left - to.left + (from.width - to.width) / 2;
   const y = from.top - to.top + (from.height - to.height) / 2;
-  const start = `translate(${x}px, ${y}px) scale(${from.width / to.width})`;
-  const middle = `translate(${x * .42}px, ${y * .42 - 7}px) rotate(${x < 0 ? -7 : 7}deg)`;
+  const sourceWidth = fromAngle ? from.height : from.width;
+  const start = `translate(${x}px, ${y}px) rotate(${fromAngle}deg) scale(${sourceWidth / width})`;
+  const middleAngle = fromAngle * .42 + toAngle * .58 + (x < 0 ? -7 : 7);
+  const middle = `translate(${x * .42}px, ${y * .42 - 7}px) rotate(${middleAngle}deg)`;
+  const end = `translate(0, 0) rotate(${toAngle}deg)`;
   const animation = flight.animate([
     { transform: start, opacity: 1 },
     { transform: start, opacity: 1, offset: .2 },
     { transform: middle, opacity: 1, offset: .54 },
-    { transform: 'translate(0, 0)', opacity: 1, offset: .88 },
-    { transform: 'translate(0, 0)', opacity: 0 },
+    { transform: end, opacity: 1, offset: .88 },
+    { transform: end, opacity: 0 },
   ], { duration, delay, easing: 'ease-in-out' });
   grip.animate([
     { transform: 'translate(25%, 30%)', opacity: 0 },
@@ -158,7 +164,7 @@ function carryCard(visual, from, to, { duration = 350, delay = 0 } = {}) {
 
 function createSeats() {
   seats = race.players.map((player, index) => {
-    const { side } = seating[index];
+    const { side, angle = 0 } = seating[index];
     const name = racerName(index);
     const element = seatTemplate.cloneNode(true);
     element.classList.add(side);
@@ -170,7 +176,7 @@ function createSeats() {
     blitz.append(cardBack(player.tool));
     const slots = new Map([...element.querySelectorAll('.play-card')].map(button => [sourceOf(button), button]));
     return {
-      element, slots, stock, blitz,
+      element, slots, stock, blitz, angle,
       points: element.querySelector('.seat-score'),
       woodCount: element.querySelector('.wood-count'),
       blitzCount: element.querySelector('.blitz-count'),
@@ -218,7 +224,7 @@ function showStack(container, pile, index) {
     visual.classList.add('pile-layer');
     const tiltIndex = (index + pile.cards.length - recent.length + layer) % tilts.length;
     visual.style.setProperty('--tilt', `${tilts[tiltIndex]}deg`);
-    visual.style.setProperty('--offset', `${(layer - (recent.length - 1) / 2) * 4}%`);
+    visual.style.setProperty('--offset', `${(layer - (recent.length - 1) / 2) * 3}%`);
     return visual;
   }));
 }
@@ -341,9 +347,9 @@ function revealOnArrival(face, duration, delay = 0) {
   }
 }
 
-function revealTransfer(card, from, button, { delay = 0, duration = 315 } = {}) {
+function revealTransfer(card, from, button, { delay = 0, duration = 315, angle = 0 } = {}) {
   if (motion.matches) return;
-  carryCard(turningCard(card, true), from, slotRect(button), { delay, duration });
+  carryCard(turningCard(card, true), from, slotRect(button), { delay, duration, fromAngle: angle, toAngle: angle });
   revealOnArrival(button.firstElementChild, duration, delay);
 }
 
@@ -364,11 +370,11 @@ function applyPlay(player, source, destination, cardId, from) {
   const pile = race.piles[index];
   const target = pileGrid.children[index].querySelector('.pile-card').lastElementChild;
   const duration = 350;
-  carryCard(pile.closed ? turningCard(card, false) : cardFace(card), origin, target.getBoundingClientRect(), { duration });
+  carryCard(pile.closed ? turningCard(card, false) : cardFace(card), origin, target.getBoundingClientRect(), { duration, fromAngle: seat.angle });
   revealOnArrival(target, duration);
   if (source !== WOOD_CARD) {
     const replacement = visibleCard(race.players[player], source);
-    if (replacement) revealTransfer(replacement, blitzOrigin, seat.slots.get(source), { delay: 135 });
+    if (replacement) revealTransfer(replacement, blitzOrigin, seat.slots.get(source), { delay: 135, angle: seat.angle });
   }
   if (race.finisher !== null) finishRace();
   return true;
@@ -389,9 +395,9 @@ function turnWood(player) {
   const receiver = seat.slots.get(WOOD_CARD);
   const top = drawn.at(-1);
   for (let index = 0; index < drawn.length - 1; index++) {
-    carryCard(cardBack(top.tool), origin, slotRect(receiver), { delay: index * 55, duration: 215 });
+    carryCard(cardBack(top.tool), origin, slotRect(receiver), { delay: index * 55, duration: 215, fromAngle: seat.angle, toAngle: seat.angle });
   }
-  revealTransfer(top, origin, receiver, { delay: (drawn.length - 1) * 55, duration: 280 });
+  revealTransfer(top, origin, receiver, { delay: (drawn.length - 1) * 55, duration: 280, angle: seat.angle });
 }
 
 function tick() {
@@ -449,7 +455,6 @@ function startRace() {
   }));
   $('#lobby').hidden = true;
   $('#arena').hidden = false;
-  $('#pause').hidden = false;
   createSeats();
   render();
   resumeClock();
@@ -463,7 +468,6 @@ function showSetup() {
   refreshProfiles();
   openDialog()?.close();
   $('#arena').hidden = true;
-  $('#pause').hidden = true;
   $('#lobby').hidden = false;
   $('.start').focus();
 }
@@ -719,11 +723,15 @@ setupForm.addEventListener('submit', event => {
   startRace();
 });
 
-$('#help').addEventListener('click', () => showDialog($('#rules-dialog')));
-$('#settings').addEventListener('click', () => {
-  for (const [key, value] of Object.entries(variants)) variantsForm.elements[key].checked = value;
-  showDialog($('#settings-dialog'));
-});
+for (const button of [$('#help'), $('#lobby-rules')]) {
+  button.addEventListener('click', () => showDialog($('#rules-dialog')));
+}
+for (const button of [$('#settings'), $('#lobby-settings')]) {
+  button.addEventListener('click', () => {
+    for (const [key, value] of Object.entries(variants)) variantsForm.elements[key].checked = value;
+    showDialog($('#settings-dialog'));
+  });
+}
 $('#pause').addEventListener('click', () => showDialog($('#pause-dialog')));
 $('#resume').addEventListener('click', () => $('#pause-dialog').close());
 $('#restart').addEventListener('click', startRace);
