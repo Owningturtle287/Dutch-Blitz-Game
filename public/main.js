@@ -2,6 +2,9 @@ import {
   DEFAULT_RULES, NEW_PILE, WOOD_CARD, RANKS, OPEN_RANK, newRace, visibleCard, destinations,
   legalMoves, woodCount, isBlocked, flipWood, play, score, chooseMove, reactionTime,
 } from './engine.js';
+import { newMatch, recordRound, levelProgress } from './match.js';
+import { createProfileStore, normalizeName } from './profiles.js';
+import { showTally } from './tally.js';
 
 const $ = selector => document.querySelector(selector);
 const table = $('.table');
@@ -23,7 +26,8 @@ const seating = [
 const ROUND_DELAY = 10000;
 
 let race;
-let settings;
+let match;
+let roundNumber;
 let seats = [];
 let selected = null;
 let startedAt = null;
@@ -48,6 +52,13 @@ function saveSetting(key, value) {
   catch { /* The game remains playable when storage is unavailable. */ }
 }
 
+function browserStorage() {
+  try { return localStorage; }
+  catch { return undefined; }
+}
+
+const profiles = createProfileStore(browserStorage());
+const racerName = index => index === 0 ? match.settings.name : seating[index].name;
 const cardName = card => `${colors[card.suit]} ${card.rank}`;
 const timeNow = () => elapsed + (startedAt === null ? 0 : performance.now() - startedAt);
 const openDialog = () => document.querySelector('dialog[open]');
@@ -147,7 +158,8 @@ function carryCard(visual, from, to, { duration = 350, delay = 0 } = {}) {
 
 function createSeats() {
   seats = race.players.map((player, index) => {
-    const { name, side } = seating[index];
+    const { side } = seating[index];
+    const name = racerName(index);
     const element = seatTemplate.cloneNode(true);
     element.classList.add(side);
     element.setAttribute('aria-label', index === 0 ? 'Your seat' : `${name}'s seat`);
@@ -246,7 +258,10 @@ function renderSeat(player, index, active) {
   const wood = woodCount(player);
   const blitz = player.blitz.length;
   const tool = toolNames[player.tool];
-  seat.points.textContent = `${score(player)} pts`;
+  const points = score(player);
+  const gameTotal = match.totals[index] + points;
+  seat.points.textContent = `${gameTotal} pts`;
+  seat.points.title = match.settings.rounds === null ? 'Round score' : `Round ${points} · Game ${gameTotal}`;
   seat.woodCount.textContent = wood;
   seat.blitzCount.textContent = blitz;
   seat.stock.disabled = !human || !active || !wood;
@@ -394,10 +409,10 @@ function tick() {
       bot.rhythm = .73 + Math.random() * .60;
       bot.rhythmUntil = now + 2300 + Math.random() * 3900;
     }
-    const move = chooseMove(race, bot.player, settings.difficulty);
+    const move = chooseMove(race, bot.player, match.settings.difficulty);
     if (move?.flip) turnWood(bot.player);
     else if (move) applyPlay(bot.player, move.source, move.pile, visibleCard(race.players[bot.player], move.source).id);
-    bot.next = now + reactionTime(bot.player, settings.difficulty, bot.rhythm);
+    bot.next = now + reactionTime(bot.player, match.settings.difficulty, bot.rhythm);
     if (race.finisher !== null) return;
   }
   updateStatus();
@@ -421,7 +436,9 @@ function startRace() {
   stopClock();
   clearTimeout(finishTimer);
   openDialog()?.close();
-  race = newRace(settings.opponents + 1, Math.random, variants);
+  roundNumber = match.completed + 1;
+  race = newRace(match.settings.players, Math.random, variants);
+  $('#match-round').textContent = match.settings.rounds === null ? 'Free Play' : `Round ${roundNumber}/${match.settings.rounds}`;
   selected = null;
   message = null;
   elapsed = 0;
@@ -442,6 +459,8 @@ function showSetup() {
   stopClock();
   clearTimeout(finishTimer);
   race = null;
+  match = null;
+  refreshProfiles();
   openDialog()?.close();
   $('#arena').hidden = true;
   $('#pause').hidden = true;
@@ -449,26 +468,42 @@ function showSetup() {
   $('.start').focus();
 }
 
+function nextRound() {
+  if (match.completed === match.settings.rounds) match = newMatch(match.settings, crypto.randomUUID());
+  startRace();
+}
+
 function finishRace() {
   stopClock();
-  const player = race.players[0];
-  const finisher = seating[race.finisher].name;
-  $('#finish-title').textContent = race.finisher === 0 ? 'You called Blitz!' : `${finisher} called Blitz!`;
-  $('#finish-summary').textContent = `You scored ${score(player)} points in ${formatTime(Math.max(0, elapsed - ROUND_DELAY))}.`;
-  const positions = race.players.map((racer, index) => ({ ...racer, name: seating[index].name, points: score(racer) }));
-  positions.sort((a, b) => b.points - a.points);
-  $('#standings').replaceChildren(...positions.map(({ name, points, played, blitz }) => {
-    const row = document.createElement('li');
-    const total = document.createElement('strong');
-    total.textContent = `${points} pts`;
-    const detail = document.createElement('small');
-    detail.textContent = `${played} played · ${blitz.length} left in Blitz`;
-    row.append(name, total, detail);
-    return row;
+  const result = recordRound(match, roundNumber, race.players.map(score));
+  if (!result) return;
+
+  const racers = race.players.map((racer, index) => ({
+    name: racerName(index), tool: racer.tool, played: racer.played, remaining: racer.blitz.length,
   }));
+  const cards = race.piles.flatMap(pile => [...pile.cards].reverse());
+  const profile = result.xp ? profiles.award(match.settings.name, result.awardId, result.xp) : null;
+  const finishTime = formatTime(Math.max(0, elapsed - ROUND_DELAY));
+  const caller = race.finisher === 0 ? 'You' : racerName(race.finisher);
+  $('#result-round').textContent = result.freePlay ? 'Free Play' : `Round ${roundNumber} of ${match.settings.rounds}`;
+  $('#finish-title').textContent = result.final ? 'Game complete' : 'Round complete';
+  $('#finish-summary').textContent = `${caller} called Blitz in ${finishTime}.`;
+  $('#next-label').textContent = result.final ? 'Play again' : result.freePlay ? 'Play another round' : 'Next round';
+  $('#result-progress').hidden = true;
+
   finishTimer = setTimeout(() => {
     openDialog()?.close();
-    $('#finish-dialog').showModal();
+    showTally($('#finish-dialog'), {
+      result, racers, cards, face: cardFace, back: cardBack, reducedMotion: motion.matches,
+      onSettled() {
+        if (!profile) return;
+        const place = ['1st', '2nd', '3rd', '4th'][result.placement - 1];
+        const progress = $('#result-progress');
+        $('#result-xp').textContent = `+${result.xp} XP · ${place} place`;
+        paintProgress(progress, profile);
+        progress.hidden = false;
+      },
+    });
   }, motion.matches ? 0 : 465);
 }
 
@@ -589,13 +624,98 @@ for (const card of [{ suit: 'grove', rank: 6 }, { suit: 'tide', rank: 2 }, { sui
   lobbyArt.append(face);
 }
 const setupForm = $('#setup');
-if ([1, 2, 3].includes(previous.opponents)) setupForm.elements.opponents.value = String(previous.opponents);
+const nameInput = $('#profile-name');
+const roundsInput = $('#rounds');
+const freePlay = $('#free-play');
+const profileTemplate = $('#profile-template').content.firstElementChild;
+const savedPlayers = previous.players ?? (Number.isInteger(previous.opponents) ? previous.opponents + 1 : 4);
+if ([2, 3, 4].includes(savedPlayers)) setupForm.elements.players.value = String(savedPlayers);
 if (['relaxed', 'quick', 'expert'].includes(previous.difficulty)) setupForm.elements.difficulty.value = previous.difficulty;
+if (Number.isSafeInteger(previous.rounds) && previous.rounds > 0) roundsInput.value = previous.rounds;
+freePlay.checked = previous.rounds === null;
+roundsInput.disabled = freePlay.checked;
+nameInput.value = readSetting('player-name', '');
+
+function paintProgress(element, profile) {
+  const { level, xp, goal } = levelProgress(profile.totalXp);
+  element.querySelector('.profile-level').textContent = `Level ${level}`;
+  element.querySelector('.profile-xp').textContent = `${xp} / ${goal} XP`;
+  const meter = element.querySelector('progress');
+  meter.max = goal;
+  meter.value = xp;
+  meter.setAttribute('aria-label', `${profile.name}'s level ${level} progress`);
+}
+
+function refreshProfileProgress() {
+  const name = normalizeName(nameInput.value);
+  const element = $('#setup-progress');
+  element.hidden = !name;
+  if (name) paintProgress(element, profiles.find(name) ?? { name, totalXp: 0 });
+}
+
+function refreshProfiles() {
+  const saved = profiles.list();
+  const content = saved.map(profile => {
+    const option = document.createElement('option');
+    option.value = profile.name;
+    return option;
+  });
+  $('#profile-names').replaceChildren(...content);
+  $('#profiles').hidden = !saved.length;
+  const choices = saved.map(profile => {
+    const option = profileTemplate.cloneNode(true);
+    option.querySelector('.saved-name').textContent = profile.name;
+    paintProgress(option, profile);
+    option.addEventListener('click', () => {
+      nameInput.value = profile.name;
+      nameInput.setCustomValidity('');
+      refreshProfileProgress();
+      $('#profiles-dialog').close();
+      nameInput.focus();
+    });
+    return option;
+  });
+  $('#profile-list').replaceChildren(...choices);
+  refreshProfileProgress();
+}
+
+nameInput.addEventListener('input', () => {
+  nameInput.setCustomValidity('');
+  refreshProfileProgress();
+});
+freePlay.addEventListener('change', () => { roundsInput.disabled = freePlay.checked; });
+roundsInput.addEventListener('input', () => roundsInput.setCustomValidity(''));
+$('#profiles').addEventListener('click', () => {
+  refreshProfiles();
+  showDialog($('#profiles-dialog'));
+});
+window.addEventListener('storage', event => {
+  if (event.key === null || event.key.startsWith('overcurrent:profile:') || event.key.startsWith('overcurrent:award:')) refreshProfiles();
+});
+refreshProfiles();
+
 setupForm.addEventListener('submit', event => {
   event.preventDefault();
+  const name = normalizeName(nameInput.value);
+  if (!name) {
+    nameInput.setCustomValidity('Enter a player name.');
+    return nameInput.reportValidity();
+  }
   const form = new FormData(setupForm);
-  settings = { opponents: Number(form.get('opponents')), difficulty: form.get('difficulty') };
+  const settings = {
+    players: Number(form.get('players')),
+    difficulty: form.get('difficulty'),
+    rounds: freePlay.checked ? null : Number(form.get('rounds')),
+  };
+  if (settings.rounds !== null && (!Number.isSafeInteger(settings.rounds) || settings.rounds < 1)) {
+    roundsInput.setCustomValidity('Enter a positive whole number of rounds.');
+    return roundsInput.reportValidity();
+  }
+  const profile = profiles.ensure(name);
+  nameInput.value = profile.name;
   saveSetting('setup', settings);
+  saveSetting('player-name', profile.name);
+  match = newMatch({ ...settings, name: profile.name }, crypto.randomUUID());
   startRace();
 });
 
@@ -608,7 +728,7 @@ $('#pause').addEventListener('click', () => showDialog($('#pause-dialog')));
 $('#resume').addEventListener('click', () => $('#pause-dialog').close());
 $('#restart').addEventListener('click', startRace);
 $('#exit').addEventListener('click', showSetup);
-$('#rematch').addEventListener('click', startRace);
+$('#rematch').addEventListener('click', nextRound);
 $('#setup-again').addEventListener('click', showSetup);
 $('#finish-dialog').addEventListener('cancel', event => event.preventDefault());
 document.querySelectorAll('dialog').forEach(dialog => dialog.addEventListener('close', resumeClock));

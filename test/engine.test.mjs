@@ -26,7 +26,8 @@ test('four seats start with no shared piles and four distinct, complete tool dec
   assert.equal(new Set(all.map(item => item.id)).size, 160);
   assert.deepEqual(new Set(players.map(player => player.tool)), new Set(DECK_TOOLS));
   for (const suit of SUITS) assert.equal(all.filter(item => item.suit === suit).length, 40);
-  for (const player of players) {
+  for (const [owner, player] of players.entries()) {
+    assert.ok(outstanding(player).every(item => item.owner === owner));
     assert.deepEqual([player.blitz.length, player.posts.length, woodCount(player)], [10, 3, 27]);
     assert.ok(outstanding(player).every(item => item.tool === player.tool));
     for (const suit of SUITS) {
