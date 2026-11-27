@@ -4,7 +4,7 @@ const CACHE = `${CACHE_PREFIX}local-v1`;
 const APP_FILES = [
   './', './index.html', './style.css', './engine.js', './main.js', './manifest.webmanifest',
   './assets/zap.svg', './assets/waves.svg', './assets/flame.svg', './assets/leaf.svg',
-  './assets/card-art.svg',
+  './assets/card-art.svg', './assets/walnut-table.webp',
   './assets/icon-192.png', './assets/icon-512.png', './assets/LUCIDE-LICENSE.txt',
 ];
 const appUrls = new Set(APP_FILES.map(path => new URL(path, scope).href));

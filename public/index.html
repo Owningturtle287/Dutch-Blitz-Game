@@ -18,6 +18,7 @@
     <header class="masthead">
       <div class="wordmark"><span class="brand-mark" aria-hidden="true">ϟ</span> Overcurrent<span class="brand-dot">.</span></div>
       <nav aria-label="Game controls">
+        <button class="ghost pause" id="pause" type="button" hidden>Pause</button>
         <button class="ghost" id="install" type="button">Install <span aria-hidden="true">↗</span></button>
         <button class="ghost" id="help" type="button" aria-label="How to play">Rules <span aria-hidden="true">?</span></button>
       </nav>
@@ -54,37 +55,29 @@
       </section>
 
       <section class="arena" id="arena" aria-label="Race table" hidden>
-        <div class="race-bar">
-          <div class="rivals" id="rivals" aria-label="Opponents"></div>
-          <button type="button" class="pause" id="pause" aria-label="Pause race">Ⅱ</button>
-        </div>
+        <p class="orientation-hint">Rotate for a wider view of the table.</p>
         <section class="table" aria-labelledby="table-title">
           <div class="table-heading">
             <div class="table-label"><h2 id="table-title">Shared piles</h2><span class="pile-count" id="pile-count" aria-label="Pile count"></span></div>
             <time id="clock" aria-label="Elapsed time">0:00</time>
-            <button type="button" class="new-pile" id="new-pile" data-pile="-1"><span aria-hidden="true">+</span> New pile</button>
           </div>
+          <button type="button" class="new-pile" id="new-pile" data-pile="-1"><span aria-hidden="true">+</span> New pile</button>
           <div class="piles" id="piles"></div>
-          <div class="pile-nav">
-            <button class="pile-arrow" id="pile-prev" type="button" aria-label="Previous piles" aria-controls="piles" disabled>‹</button>
-            <p class="status" id="status" role="status"></p>
-            <button class="pile-arrow" id="pile-next" type="button" aria-label="More piles" aria-controls="piles" disabled>›</button>
-          </div>
-        </section>
-        <section class="player" aria-labelledby="hand-title">
-          <div class="hand-heading">
-            <div>
+          <p class="status" id="status" role="status"></p>
+          <div class="rivals" id="rivals" role="group" aria-label="Opponents"></div>
+          <section class="player" aria-labelledby="hand-title">
+            <div class="seat-heading">
               <span class="draw-deck" id="draw-deck" role="img"></span>
-              <h2 id="hand-title">Your hand</h2><span class="hand-count" id="remaining"></span>
+              <div><h2 id="hand-title">Your hand</h2><span class="hand-count" id="remaining"></span></div>
+            </div>
+            <div class="hand" id="hand">
+              <button class="hand-card" type="button" data-slot="0"></button>
+              <button class="hand-card" type="button" data-slot="1"></button>
+              <button class="hand-card" type="button" data-slot="2"></button>
+              <button class="hand-card" type="button" data-slot="3"></button>
             </div>
             <button type="button" class="cycle" id="cycle"><span aria-hidden="true">↻</span> Swap card</button>
-          </div>
-          <div class="hand" id="hand">
-            <button class="hand-card" type="button" data-slot="0"></button>
-            <button class="hand-card" type="button" data-slot="1"></button>
-            <button class="hand-card" type="button" data-slot="2"></button>
-            <button class="hand-card" type="button" data-slot="3"></button>
-          </div>
+          </section>
         </section>
       </section>
     </main>
@@ -92,15 +85,16 @@
 
   <dialog id="rules-dialog" aria-labelledby="rules-title">
     <form method="dialog" class="dialog-top"><h2 id="rules-title">How to race</h2><button class="close" aria-label="Close rules">×</button></form>
-    <p>Everyone plays at once. Clear all <strong>40 cards</strong> to win. Each deck has a 1 through 10 in yellow, blue, red, and green, with one tool printed on every back.</p>
+    <p>Everyone plays at once. You start with <strong>4 cards in hand</strong> and 36 in your deck. Every play draws a replacement while your deck has cards. The first racer to play all <strong>40 cards</strong> wins.</p>
+    <p>The table starts with three shared piles. The rule shown on each pile tells you what can go on top.</p>
     <dl class="rule-list">
-      <div><dt><span>↑</span> Rise</dt><dd>Play one number higher. After 10 comes 1.</dd></div>
+      <div><dt><span>↑</span> Rise</dt><dd>Play one number higher in any color. After 10 comes 1.</dd></div>
       <div><dt><span>＝</span> Match</dt><dd>Play the same color. Any number works.</dd></div>
-      <div><dt><span>↓</span> Fall</dt><dd>Play one number lower. After 1 comes 10.</dd></div>
+      <div><dt><span>↓</span> Fall</dt><dd>Play one number lower in any color. After 1 comes 10.</dd></div>
     </dl>
-    <p>Play a <strong>1</strong> to open a new pile. New piles cycle through Rise, Match, and Fall. Swipe the row or use the arrows to see more piles.</p>
-    <p>Tap a highlighted card or drag it to a pile. If it fits in several places, choose a pile. Each play draws a replacement while cards remain in your deck.</p>
-    <p>Select a card and tap <strong>Swap card</strong> to trade it for your next card. If nobody can play, the tops of the piles reset.</p>
+    <p>Tap a highlighted card to play it. If it fits in several places, tap a highlighted pile. You can also drag a card to its destination.</p>
+    <p>Play a <strong>1</strong> on <strong>New pile</strong> to start another shared pile. New piles cycle through Rise, Match, and Fall.</p>
+    <p><strong>Swap card</strong> sends a card to the bottom of your deck and draws the next one. If no card is selected, the game swaps a blocked card first. When everyone is blocked, the pile tops reset and each pile keeps its rule.</p>
     <p class="credits">Suit icons by <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer">Lucide</a> under the <a href="./assets/LUCIDE-LICENSE.txt">ISC license</a>.</p>
   </dialog>
 
@@ -138,7 +132,13 @@
       <svg viewBox="0 0 72 64" focusable="false"><use /></svg>
     </span>
   </template>
-  <template id="pile-template"><button class="pile" type="button"><span class="pile-title"><span class="pile-order" aria-hidden="true"></span><span class="pile-kind" aria-hidden="true"></span></span><span class="pile-card"></span><span class="pile-rule"></span></button></template>
+  <template id="pile-template">
+    <button class="pile" type="button">
+      <span class="pile-kind" aria-hidden="true"></span>
+      <span class="pile-card"></span>
+      <span class="pile-rule" aria-hidden="true"></span><span class="pile-cue" aria-hidden="true"></span>
+    </button>
+  </template>
   <script type="module" src="./main.js"></script>
 </body>
 </html>
