@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101c24">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="A real-time card race. Read the lanes and clear your deck first.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/icon-192.png">
+  <link rel="apple-touch-icon" href="./assets/icon-192.png">
+  <link rel="stylesheet" href="./style.css">
+  <title>Overcurrent</title>
+</head>
+<body>
+  <div class="app">
+    <header class="masthead">
+      <div class="wordmark"><span class="brand-mark" aria-hidden="true">ϟ</span> Overcurrent<span class="brand-dot">.</span></div>
+      <nav aria-label="Game controls">
+        <button class="ghost" id="install" type="button">Install <span aria-hidden="true">↗</span></button>
+        <button class="ghost" id="help" type="button" aria-label="How to play">Rules <span aria-hidden="true">?</span></button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="lobby" id="lobby" aria-labelledby="lobby-title">
+        <div class="lobby-art" aria-hidden="true">
+          <div class="art-orbit"></div>
+          <div class="card-face suit-tide art-tide"><span class="card-rank">2</span><span class="suit-icon"></span><span class="card-corner">02</span></div>
+          <div class="card-face suit-grove art-grove"><span class="card-rank">6</span><span class="suit-icon"></span><span class="card-corner">06</span></div>
+          <div class="card-face suit-spark art-spark"><span class="card-rank">3</span><span class="suit-icon"></span><span class="card-corner">03</span></div>
+        </div>
+        <div class="lobby-copy">
+          <h1 id="lobby-title">Clear<br> your deck<span>.</span></h1>
+          <p>Race the table in real time. Play all 24 cards before your rivals do.</p>
+          <form id="setup">
+            <fieldset>
+              <legend>Opponents</legend>
+              <div class="segments">
+                <label><input type="radio" name="opponents" value="1"><span>1</span></label>
+                <label><input type="radio" name="opponents" value="2"><span>2</span></label>
+                <label><input type="radio" name="opponents" value="3" checked><span>3</span></label>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend>Pace</legend>
+              <div class="segments">
+                <label><input type="radio" name="difficulty" value="relaxed"><span>Relaxed</span></label>
+                <label><input type="radio" name="difficulty" value="quick" checked><span>Quick</span></label>
+                <label><input type="radio" name="difficulty" value="expert"><span>Expert</span></label>
+              </div>
+            </fieldset>
+            <button class="primary start" type="submit">Start race <span aria-hidden="true">→</span></button>
+          </form>
+        </div>
+      </section>
+
+      <section class="arena" id="arena" aria-label="Race table" hidden>
+        <div class="race-bar">
+          <div class="rivals" id="rivals" aria-label="Opponents"></div>
+          <button type="button" class="pause" id="pause" aria-label="Pause race">Ⅱ</button>
+        </div>
+        <section class="table" aria-labelledby="table-title">
+          <div class="table-heading"><h2 id="table-title">Shared lanes</h2><time id="clock" aria-label="Elapsed time">0:00</time></div>
+          <div class="lanes" id="lanes">
+            <button class="lane" type="button" data-lane="0"><span class="lane-title"><span aria-hidden="true">↑</span> Rise</span><span class="lane-card"></span><span class="lane-rule"></span></button>
+            <button class="lane" type="button" data-lane="1"><span class="lane-title"><span aria-hidden="true">＝</span> Match</span><span class="lane-card"></span><span class="lane-rule"></span></button>
+            <button class="lane" type="button" data-lane="2"><span class="lane-title"><span aria-hidden="true">↓</span> Fall</span><span class="lane-card"></span><span class="lane-rule"></span></button>
+          </div>
+          <p class="status" id="status" role="status"></p>
+        </section>
+        <section class="player" aria-labelledby="hand-title">
+          <div class="hand-heading">
+            <div><h2 id="hand-title">Your hand</h2><span class="hand-count" id="remaining"></span></div>
+            <button type="button" class="cycle" id="cycle"><span aria-hidden="true">↻</span> Swap card</button>
+          </div>
+          <div class="hand" id="hand">
+            <button class="hand-card" type="button" data-slot="0"></button>
+            <button class="hand-card" type="button" data-slot="1"></button>
+            <button class="hand-card" type="button" data-slot="2"></button>
+            <button class="hand-card" type="button" data-slot="3"></button>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="rules-dialog" aria-labelledby="rules-title">
+    <form method="dialog" class="dialog-top"><h2 id="rules-title">How to race</h2><button class="close" aria-label="Close rules">×</button></form>
+    <p>Everyone plays at once. Clear all <strong>24 cards</strong> to win. Every play automatically draws a replacement until your deck runs out.</p>
+    <dl class="rule-list">
+      <div><dt><span>↑</span> Rise</dt><dd>Play one number higher. After 6 comes 1.</dd></div>
+      <div><dt><span>＝</span> Match</dt><dd>Play the same symbol. Any number works.</dd></div>
+      <div><dt><span>↓</span> Fall</dt><dd>Play one number lower. After 1 comes 6.</dd></div>
+    </dl>
+    <p>Tap a highlighted card to play it. If several lanes fit, choose a lane. You can also drag a card directly onto a lane.</p>
+    <p>Select a card and tap <strong>Swap card</strong> to put it at the back of your deck and draw a new one. If nobody can play, the lanes reset.</p>
+    <p class="credits">Suit icons by <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer">Lucide</a> under the <a href="./assets/LUCIDE-LICENSE.txt">ISC license</a>.</p>
+  </dialog>
+
+  <dialog id="install-dialog" aria-labelledby="install-title">
+    <form method="dialog" class="dialog-top"><h2 id="install-title">Add to home screen</h2><button class="close" aria-label="Close install instructions">×</button></form>
+    <p><strong>iPhone and iPad</strong><br>Open this link in Safari, tap Share, then tap Add to Home Screen.</p>
+    <p><strong>Android</strong><br>In Chrome, open the menu and choose Add to home screen or Install app.</p>
+    <p>Open the Overcurrent icon to play. After the first visit loads, the game also works offline.</p>
+  </dialog>
+
+  <dialog id="pause-dialog" aria-labelledby="pause-title">
+    <div class="dialog-top"><h2 id="pause-title">Race paused</h2></div>
+    <button class="primary full" id="resume" type="button">Resume race <span aria-hidden="true">→</span></button>
+    <button class="ghost full" id="exit" type="button">Back to setup</button>
+  </dialog>
+
+  <dialog id="finish-dialog" aria-labelledby="finish-title">
+    <div class="dialog-top"><h2 id="finish-title"></h2></div>
+    <p id="finish-summary"></p>
+    <ol id="standings" class="standings"></ol>
+    <button class="primary full" id="rematch" type="button">Race again <span aria-hidden="true">→</span></button>
+    <button class="ghost full" id="setup-again" type="button">Change setup</button>
+  </dialog>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

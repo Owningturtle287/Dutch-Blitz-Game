@@ -1,3 +1,23 @@
 # Overcurrent
 
-A real-time mobile card race for one player and up to three computer rivals.
+Overcurrent is a mobile-first, real-time card race for one player and up to three computer rivals. Play all 24 cards before the others do. Everyone shares three lanes, each with its own rule.
+
+| Lane | Rule |
+| --- | --- |
+| Rise | Play one number higher. After 6 comes 1. |
+| Match | Play the same symbol. Any number works. |
+| Fall | Play one number lower. After 1 comes 6. |
+
+Tap a highlighted card to play it. If multiple lanes fit, choose one. You can also drag a card straight to a lane. Swap a card when your hand gets stuck. The lanes reset when nobody can play.
+
+## Play and install
+
+The [GitHub Pages site](https://owningturtle287.github.io/Dutch-Blitz-Game/) is published by the [Pages workflow](../../actions/workflows/pages.yml). For an initial setup, select **GitHub Actions** under **Settings → Pages → Build and deployment** and run the workflow. Pushes to `main` deploy automatically after setup.
+
+On iPhone or iPad, open the site in Safari and tap **Share → Add to Home Screen**. On Android, use Chrome’s **Install app** or **Add to Home Screen** option. Once the first visit has finished loading, you can play offline.
+
+## Develop
+
+Serve `public` with any local web server, for example `python3 -m http.server 8000 --directory public`. Run the engine checks with `node --test`.
+
+Suit pictograms come from [Lucide](https://lucide.dev/) under the [ISC license](public/assets/LUCIDE-LICENSE.txt).
