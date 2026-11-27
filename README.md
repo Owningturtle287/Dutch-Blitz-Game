@@ -6,10 +6,12 @@ Dutch Blitz is a landscape, real-time card race for one player and up to three c
 
 - Start a shared pile with a 1. Each next card must be one rank higher and the same color. A 10 on a 9 goes face down and closes the pile.
 - Play one of the three face-up cards to move the top Blitz card into its spot. The round ends as soon as a racer empties their Blitz pile.
-- Flip up to three cards from Wood at a time. Playing the exposed card reveals the next card in that batch. You can wait for a match or advance to the next batch. At the end of the stock, shuffle all unplayed Wood cards for the next pass.
+- Flip three Wood cards at a time while enough remain. Playing the exposed card reveals the next one in the batch. You can wait for a match or flip again. If a draw runs out of stock, shuffle the unplayed Wood cards to finish the batch.
 - Score one point for each card you played to the table and lose two points for each card left in your Blitz pile.
 
-You sit at the bottom of the table. Tap or drag a face-up card or the exposed Wood card. Settings can enable any-color runs, same-color matches, and descending plays for the next round.
+You sit at the bottom of the table. Drag a face-up card or the exposed Wood card onto the table to play it on the nearest eligible pile. You can also tap a 1 to open a pile. Settings can enable any-color runs, same-color matches, and descending plays for the next round.
+
+Rivals inspect one card or pile at a time and remember what they have seen. Unsuccessful Wood draws, long stretches without clearing Blitz cards, and contested plays increase their visible stress. Their names stay with the game across rounds.
 
 ## Games and levels
 

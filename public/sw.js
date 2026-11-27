@@ -2,7 +2,7 @@ const scope = self.registration.scope;
 const CACHE_PREFIX = `overcurrent:${scope}:`;
 const CACHE = `${CACHE_PREFIX}local-v1`;
 const APP_FILES = [
-  './', './index.html', './style.css', './engine.js', './main.js', './match.js', './profiles.js', './tally.js', './manifest.webmanifest',
+  './', './index.html', './style.css', './engine.js', './main.js', './match.js', './profiles.js', './tally.js', './rival-ai.js', './rival-names.js', './manifest.webmanifest',
   './assets/card-art.svg', './assets/walnut-table.webp', './assets/card-hand.webp',
   './assets/icon-192.png', './assets/icon-512.png',
 ];

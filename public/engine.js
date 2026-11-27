@@ -10,8 +10,6 @@ export const WOOD_CARD = 'wood';
 export const OPEN_RANK = 1;
 export const DEFAULT_RULES = Object.freeze({ anyColor: false, sameColor: false, descending: false });
 
-const sample = (list, random) => list[Math.floor(random() * list.length)];
-
 export function shuffled(items, random) {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index--) {
@@ -41,8 +39,11 @@ export function visibleCard(player, source) {
 }
 
 export function accepts(pile, card, rules = DEFAULT_RULES) {
-  if (!card || pile.closed) return false;
-  const top = pile.cards.at(-1);
+  return !pile.closed && matchesTop(pile.cards.at(-1), card, rules);
+}
+
+export function matchesTop(top, card, rules = DEFAULT_RULES) {
+  if (!top || !card) return false;
   const colorMatches = card.suit === top.suit;
   const difference = card.rank - top.rank;
   return (rules.sameColor && colorMatches) ||
@@ -76,12 +77,14 @@ export function flipWood(state, playerIndex) {
   if (state.finisher !== null || !player || !woodCount(player)) return null;
 
   player.woodDiscard.push(...player.woodShown);
-  if (!player.wood.length) {
+  const batch = player.wood.splice(0, DRAW_SIZE);
+  if (batch.length < DRAW_SIZE && player.woodDiscard.length) {
     player.wood = shuffled(player.woodDiscard, state.random);
     player.woodDiscard = [];
+    batch.push(...player.wood.splice(0, DRAW_SIZE - batch.length));
   }
-  player.woodShown = player.wood.splice(0, DRAW_SIZE);
-  return player.woodShown;
+  player.woodShown = batch;
+  return batch;
 }
 
 export function play(state, playerIndex, source, destination, expectedCard) {
@@ -113,35 +116,4 @@ export function play(state, playerIndex, source, destination, expectedCard) {
 
 export function score(player) {
   return player.played - 2 * player.blitz.length;
-}
-
-const PROFILES = [
-  { reaction: 680, variation: 460, oversight: .10, hesitation: .11 },
-  { reaction: 610, variation: 580, oversight: .15, hesitation: .07 },
-  { reaction: 650, variation: 500, oversight: .08, hesitation: .16 },
-];
-
-const DIFFICULTIES = {
-  relaxed: { pace: 1.68, error: 1.45 },
-  quick: { pace: 1, error: 1 },
-  expert: { pace: .65, error: .60 },
-};
-
-export function reactionTime(playerIndex, difficulty, rhythm, random = Math.random) {
-  const profile = PROFILES[playerIndex - 1];
-  const settings = DIFFICULTIES[difficulty];
-  const jitter = (random() - .5) * profile.variation;
-  const hesitation = random() < profile.hesitation * settings.error ? 300 + random() * 600 : 0;
-  return Math.max(170, (profile.reaction + jitter + hesitation) * settings.pace * rhythm);
-}
-
-export function chooseMove(state, playerIndex, difficulty, random = state.random) {
-  if (state.finisher !== null) return null;
-  const player = state.players[playerIndex];
-  const moves = legalMoves(player, state.piles, state.rules);
-  if (!moves.length) return woodCount(player) ? { flip: true } : null;
-  if (random() < PROFILES[playerIndex - 1].oversight * DIFFICULTIES[difficulty].error) return sample(moves, random);
-
-  const posts = moves.filter(move => move.source !== WOOD_CARD);
-  return sample(posts.length ? posts : moves, random);
 }

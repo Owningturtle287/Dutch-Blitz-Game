@@ -1,0 +1,131 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { newRace, WOOD_CARD, NEW_PILE, flipWood } from '../public/engine.js';
+import { newRival, noticePileChange, settleRivalPlay, stepRival } from '../public/rival-ai.js';
+import { chooseRivalNames } from '../public/rival-names.js';
+
+const card = (rank, suit = 'spark') => ({ id: `${suit}-${rank}`, rank, suit });
+const stack = top => ({ cards: [top], closed: false });
+const steady = () => .5;
+
+function setup(piles = [], posts = [card(7), card(8), card(9)]) {
+  const race = newRace(2, steady);
+  const rival = newRival(1, 'quick', 0, steady);
+  race.piles = piles;
+  race.players[1].posts = posts;
+  race.players[1].wood = [];
+  rival.next = 0;
+  return { race, rival };
+}
+
+test('a Wood flip must settle and the exposed card needs a separate look before a play', () => {
+  const { race, rival } = setup();
+  race.players[1].wood = [card(8), card(9), card(1)];
+  rival.posts = [];
+  assert.deepEqual(stepRival(rival, race, 0), { kind: 'flip' });
+  assert.equal(flipWood(race, 1).at(-1).rank, 1);
+  assert.equal(stepRival(rival, race, 339), null);
+  assert.equal(rival.focus, null);
+  stepRival(rival, race, 340);
+  assert.deepEqual(rival.focus, { kind: 'card', source: WOOD_CARD });
+  assert.equal(rival.next, 840);
+  stepRival(rival, race, 839);
+  assert.equal(rival.cards.has(WOOD_CARD), false);
+  stepRival(rival, race, 840);
+  assert.equal(rival.focus.kind, 'play');
+  assert.equal(rival.focus.pile, NEW_PILE);
+  assert.equal(stepRival(rival, race, rival.next).cardId, 'spark-1');
+});
+
+test('rivals look at each of their three posts and one pile at a time without repeating a static scan', () => {
+  const reads = [];
+  const piles = [0, 1, 2].map(index => ({
+    closed: false,
+    get cards() {
+      reads.push(index);
+      return [card(1, 'ember')];
+    },
+  }));
+  const { race, rival } = setup(piles);
+  for (const [index, step] of [0, 1, 2, 3].entries()) {
+    stepRival(rival, race, index * 500);
+    assert.equal(rival.cards.size, step);
+    assert.deepEqual(reads, []);
+  }
+  assert.equal(rival.focus.kind, 'pile');
+  stepRival(rival, race, 2000);
+  assert.equal(reads.length, 1);
+  for (let clock = 2050; clock < 8000; clock += 50) stepRival(rival, race, clock);
+  assert.deepEqual([...reads].sort(), [0, 1, 2]);
+  noticePileChange(rival, 1, 0, 8000);
+  for (let clock = 8000; clock < 9000; clock += 50) stepRival(rival, race, clock);
+  assert.deepEqual(reads.slice(3), [1]);
+});
+
+test('nearby ranks bias the scan without exposing the current pile tops', () => {
+  const { race, rival } = setup([stack(card(5)), stack(card(1))]);
+  rival.posts = [];
+  rival.cards.set(0, card(6));
+  rival.piles.set(0, card(5));
+  rival.piles.set(1, card(1));
+  rival.unread = new Set([0, 1]);
+  rival.random = () => .6;
+  stepRival(rival, race, 0);
+  assert.deepEqual(rival.focus, { kind: 'pile', pile: 0, favored: true });
+});
+
+test('unsuccessful Wood, slow Blitz progress and contested moves raise visible stress', () => {
+  const { race, rival } = setup();
+  rival.posts = [];
+  race.players[1].wood = [card(6), card(7), card(8)];
+  for (let clock = 0; clock < 24000; clock += 50) {
+    if (stepRival(rival, race, clock)?.kind === 'flip') flipWood(race, 1);
+  }
+  assert.ok(rival.dryFlips > 3);
+  assert.ok(rival.stress > 30 && rival.stress <= 100);
+
+  rival.stress = 78;
+  rival.spokeAt = -Infinity;
+  rival.focus = { kind: 'play', pile: 0, source: 0 };
+  noticePileChange(rival, 0, 0, 25000);
+  assert.ok(rival.focus.contested);
+  assert.equal(rival.stress, 85.5);
+  assert.ok(rival.speech.text);
+  noticePileChange(rival, 0, 0, 25010);
+  assert.equal(rival.stress, 85.5);
+  settleRivalPlay(rival, { source: 0, pile: 0 }, true, false, 25500);
+  assert.equal(rival.stress, 79.5);
+  assert.equal(rival.lastBlitz, 25500);
+});
+
+test('high stress can produce a wrong-pile attempt after a slower decision', () => {
+  const { race, rival } = setup([stack(card(5)), stack(card(5, 'ember'))]);
+  rival.pileCount = 2;
+  rival.posts = [];
+  rival.cards.set(0, card(6));
+  rival.piles.set(0, card(5));
+  rival.piles.set(1, card(5, 'ember'));
+  rival.random = () => .2;
+
+  stepRival(rival, race, 0);
+  assert.equal(rival.focus.pile, 0);
+  const calmDelay = rival.next;
+  rival.focus = null;
+  rival.next = 0;
+  rival.stress = 100;
+  stepRival(rival, race, 0);
+  assert.equal(rival.focus.mistake, true);
+  assert.equal(rival.focus.pile, 1);
+  assert.ok(rival.next > calmDelay);
+  assert.equal(race.piles[1].cards.length, 1);
+});
+
+test('there are hundreds of unique names and a new roster can exclude the old one', () => {
+  const pool = chooseRivalNames(1000, [], steady);
+  assert.ok(pool.length >= 200);
+  assert.equal(new Set(pool).size, pool.length);
+  const old = chooseRivalNames(3, [], steady);
+  const next = chooseRivalNames(3, old, steady);
+  assert.equal(next.length, 3);
+  assert.ok(next.every(name => !old.includes(name)));
+});
