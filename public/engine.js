@@ -1,4 +1,5 @@
 export const SUITS = ['spark', 'tide', 'ember', 'grove'];
+export const DECK_TOOLS = ['wagon', 'pump', 'barrel', 'plow'];
 export const RANKS = 10;
 export const TOTAL = SUITS.length * RANKS;
 export const RULES = ['rise', 'match', 'fall'];
@@ -61,13 +62,14 @@ function placeCard(piles, destination, card) {
 }
 
 export function newRace(count, random = Math.random) {
-  if (!Number.isInteger(count) || count < 2 || count > 4) throw new RangeError('Choose 2–4 racers');
-  const players = Array.from({ length: count }, (_, player) => {
+  if (!Number.isInteger(count) || count < 2 || count > DECK_TOOLS.length) throw new RangeError('Choose 2–4 racers');
+  const tools = shuffled(DECK_TOOLS, random).slice(0, count);
+  const players = tools.map((tool, player) => {
     const pack = SUITS.flatMap(suit => Array.from({ length: RANKS }, (_, index) => ({
-      id: `${player}-${suit}-${index + 1}`, suit, rank: index + 1,
+      id: `${player}-${suit}-${index + 1}`, suit, rank: index + 1, tool,
     })));
     const deck = shuffled(pack, random);
-    return { hand: deck.splice(0, HAND_SIZE), deck, played: 0, recycleAt: 0 };
+    return { tool, hand: deck.splice(0, HAND_SIZE), deck, played: 0, recycleAt: 0 };
   });
   const state = { players, random, winner: null, turns: 0, retunes: 0 };
   state.piles = tunePiles(state, RULES);

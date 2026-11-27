@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  RANKS, SUITS, TOTAL, NEW_PILE, RULES, RECYCLE_DELAY, accepts, destinations, legalMoves, newRace, play, recycle,
+  RANKS, SUITS, DECK_TOOLS, TOTAL, NEW_PILE, RULES, RECYCLE_DELAY, accepts, destinations, legalMoves, newRace, play, recycle,
   retuneIfBlocked, chooseMove, reactionTime,
 } from '../public/engine.js';
 
@@ -23,16 +23,22 @@ test('rise and fall wrap around and match accepts any rank of the same suit', ()
   assert.equal(accepts(pile('match', 3), card(10, 'tide')), false);
 });
 
-test('each racer has one of every rank from 1 through 10 in all four colors', () => {
+test('four racers get distinct tool decks with 40 cards per color and per tool across the set', () => {
   const state = newRace(4, randomFrom(18));
   assert.equal(RANKS, 10);
   assert.equal(SUITS.length, 4);
   assert.equal(TOTAL, 40);
+  assert.deepEqual(DECK_TOOLS, ['wagon', 'pump', 'barrel', 'plow']);
+  assert.deepEqual(new Set(state.players.map(player => player.tool)), new Set(DECK_TOOLS));
   const ranks = Array.from({ length: 10 }, (_, index) => index + 1);
-  for (const { hand, deck } of state.players) {
+  const allCards = state.players.flatMap(({ hand, deck }) => [...hand, ...deck]);
+  assert.equal(allCards.length, 160);
+  assert.equal(new Set(allCards.map(item => item.id)).size, 160);
+  for (const suit of SUITS) assert.equal(allCards.filter(item => item.suit === suit).length, 40);
+  for (const { tool, hand, deck } of state.players) {
     const cards = [...hand, ...deck];
     assert.equal(cards.length, 40);
-    assert.equal(new Set(cards.map(item => item.id)).size, 40);
+    assert.ok(cards.every(item => item.tool === tool));
     for (const suit of SUITS) {
       assert.deepEqual(cards.filter(item => item.suit === suit).map(item => item.rank).sort((a, b) => a - b), ranks);
     }
@@ -120,6 +126,7 @@ test('seeded races for two, three and four players terminate and conserve all ca
   for (let count = 2; count <= 4; count++) {
     for (let seed = 1; seed <= 80; seed++) {
       const state = newRace(count, randomFrom(seed));
+      assert.equal(new Set(state.players.map(player => player.tool)).size, count);
       for (let turn = 0; turn < 500 && state.winner === null; turn++) {
         const index = turn % count;
         const player = state.players[index];

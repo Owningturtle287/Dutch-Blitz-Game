@@ -8,6 +8,8 @@ const pileStrip = $('#piles');
 const newPileButton = $('#new-pile');
 const handButtons = [...document.querySelectorAll('.hand-card')];
 const cardTemplate = $('#card-template').content.firstElementChild;
+const backTemplate = $('#back-template').content.firstElementChild;
+const drawDeck = $('#draw-deck');
 const rivals = [
   { name: 'Nova', color: '#b2def6' },
   { name: 'Sage', color: '#bfe3a2' },
@@ -15,6 +17,7 @@ const rivals = [
 ];
 const pileSymbols = { rise: '↑', match: '=', fall: '↓' };
 const colors = { spark: 'Yellow', tide: 'Blue', ember: 'Red', grove: 'Green' };
+const toolNames = { wagon: 'Wagon', pump: 'Hand pump', barrel: 'Barrel', plow: 'Plow' };
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const scheme = matchMedia('(display-mode: standalone)');
 
@@ -61,6 +64,13 @@ function cardFace(card) {
   return face;
 }
 
+function cardBack(tool) {
+  const back = backTemplate.cloneNode(true);
+  back.classList.add(`back-${tool}`);
+  back.querySelector('use').setAttribute('href', `./assets/card-art.svg#${tool}`);
+  return back;
+}
+
 function showCard(element, card) {
   const key = card ? `${card.suit}-${card.rank}` : '';
   if (element.dataset.card === key) return;
@@ -99,13 +109,19 @@ function carryCard(card, from, to, bot) {
   animation.finished.then(() => flight.remove(), () => flight.remove());
 }
 
-function createRivals(count) {
-  $('#rivals').replaceChildren(...rivals.slice(0, count).map(({ name, color }, index) => {
+function createRivals(opponents) {
+  $('#rivals').replaceChildren(...opponents.map(({ tool }, index) => {
+    const { name, color } = rivals[index];
     const element = document.createElement('div');
     element.className = 'rival';
     element.dataset.rival = index + 1;
     element.style.setProperty('--rival-color', color);
-    element.innerHTML = `<span class="rival-icon" aria-hidden="true">${name[0]}</span><span><strong class="rival-name">${name}</strong><span class="rival-count"></span></span><span class="rival-track" aria-hidden="true"><span></span></span>`;
+    element.innerHTML = `<span class="rival-deck" role="img"></span><span><strong class="rival-name">${name}</strong><span class="rival-count"></span></span><span class="rival-track" aria-hidden="true"><span></span></span>`;
+    const deck = element.querySelector('.rival-deck');
+    const label = `${toolNames[tool]} deck`;
+    deck.setAttribute('aria-label', label);
+    deck.title = label;
+    deck.append(cardBack(tool));
     return element;
   }));
 }
@@ -188,6 +204,12 @@ function render() {
   });
 
   $('#remaining').textContent = `${TOTAL - player.played} left`;
+  const drawCount = player.deck.length;
+  const deckLabel = `Your ${toolNames[player.tool].toLowerCase()} deck, ${drawCount} ${drawCount === 1 ? 'card' : 'cards'} to draw`;
+  drawDeck.setAttribute('aria-label', deckLabel);
+  drawDeck.title = deckLabel;
+  drawDeck.classList.toggle('stacked', drawCount > 1);
+  drawDeck.classList.toggle('empty', drawCount === 0);
   race.players.slice(1).forEach((opponent, index) => {
     const element = $(`[data-rival="${index + 1}"]`);
     element.querySelector('.rival-count').textContent = `${TOTAL - opponent.played} left`;
@@ -277,7 +299,8 @@ function startRace() {
   }));
   $('.lobby').hidden = true;
   $('#arena').hidden = false;
-  createRivals(settings.opponents);
+  drawDeck.replaceChildren(cardBack(race.players[0].tool));
+  createRivals(race.players.slice(1));
   render();
   pileStrip.scrollLeft = 0;
   updatePileNavigation();
