@@ -1,11 +1,14 @@
 export const SUITS = ['spark', 'tide', 'ember', 'grove'];
 export const RANKS = 6;
 export const TOTAL = SUITS.length * RANKS;
-export const LANES = ['rise', 'match', 'fall'];
+export const RULES = ['rise', 'match', 'fall'];
+export const NEW_PILE = -1;
+export const OPEN_RANK = 1;
 export const HAND_SIZE = 4;
 export const RECYCLE_DELAY = 850;
 
 const rankAfter = (rank, change) => (rank - 1 + change + RANKS) % RANKS + 1;
+const rankStep = rule => rule === 'rise' ? 1 : -1;
 const sample = (list, random) => list[Math.floor(random() * list.length)];
 
 export function shuffled(items, random) {
@@ -17,30 +20,44 @@ export function shuffled(items, random) {
   return result;
 }
 
-export function accepts(lane, top, card) {
+export function nextRank({ rule, top }) {
+  return rankAfter(top.rank, rankStep(rule));
+}
+
+export function accepts(pile, card) {
   if (!card) return false;
-  if (lane === 1) return card.suit === top.suit;
-  return card.rank === rankAfter(top.rank, lane === 0 ? 1 : -1);
+  if (pile.rule === 'match') return card.suit === pile.top.suit;
+  return card.rank === nextRank(pile);
 }
 
-export function destinations(card, lanes) {
-  return LANES.flatMap((_, lane) => accepts(lane, lanes[lane], card) ? [lane] : []);
+export function destinations(card, piles) {
+  if (!card) return [];
+  const targets = piles.flatMap((pile, index) => accepts(pile, card) ? [index] : []);
+  if (card.rank === OPEN_RANK) targets.push(NEW_PILE);
+  return targets;
 }
 
-export function legalMoves(hand, lanes) {
-  return hand.flatMap((card, slot) => destinations(card, lanes).map(lane => ({ slot, lane })));
+export function legalMoves(hand, piles) {
+  return hand.flatMap((card, slot) => destinations(card, piles).map(pile => ({ slot, pile })));
 }
 
-function tuneLanes(state) {
-  const suit = () => sample(SUITS, state.random);
-  const rank = () => Math.floor(state.random() * RANKS) + 1;
-  const visible = state.players.flatMap(player => player.hand.filter(Boolean));
-  const anchor = sample(visible, state.random);
-  const lanes = Array.from({ length: LANES.length }, () => ({ suit: suit(), rank: rank() }));
-  const lane = Math.floor(state.random() * LANES.length);
-  if (lane === 1) lanes[lane].suit = anchor.suit;
-  else lanes[lane].rank = rankAfter(anchor.rank, lane === 0 ? -1 : 1);
-  return lanes;
+function tunePiles(state, rules) {
+  const anchor = sample(state.players.flatMap(player => player.hand.filter(Boolean)), state.random);
+  const piles = rules.map(rule => ({ rule, top: {
+    suit: sample(SUITS, state.random), rank: Math.floor(state.random() * RANKS) + 1,
+  } }));
+  const { rule, top } = sample(piles, state.random);
+  if (rule === 'match') top.suit = anchor.suit;
+  else top.rank = rankAfter(anchor.rank, -rankStep(rule));
+  return piles;
+}
+
+function placeCard(piles, destination, card) {
+  if (destination === NEW_PILE) {
+    piles.push({ rule: RULES[piles.length % RULES.length], top: card });
+  } else {
+    piles[destination] = { rule: piles[destination].rule, top: card };
+  }
 }
 
 export function newRace(count, random = Math.random) {
@@ -53,19 +70,22 @@ export function newRace(count, random = Math.random) {
     return { hand: deck.splice(0, HAND_SIZE), deck, played: 0, recycleAt: 0 };
   });
   const state = { players, random, winner: null, turns: 0, retunes: 0 };
-  state.lanes = tuneLanes(state);
+  state.piles = tunePiles(state, RULES);
   return state;
 }
 
-export function play(state, playerIndex, slot, lane, expectedCard) {
-  if (state.winner !== null || !Number.isInteger(lane) || !state.lanes[lane]) return null;
+export function play(state, playerIndex, slot, destination, expectedCard) {
+  if (state.winner !== null || !Number.isInteger(destination)) return null;
   const player = state.players[playerIndex];
   const card = player?.hand[slot];
-  if (!card || card.id !== expectedCard || !accepts(lane, state.lanes[lane], card)) return null;
+  if (!card || card.id !== expectedCard) return null;
+  const pile = state.piles[destination];
+  const valid = destination === NEW_PILE ? card.rank === OPEN_RANK : pile && accepts(pile, card);
+  if (!valid) return null;
 
   player.hand[slot] = player.deck.shift() ?? null;
   player.played++;
-  state.lanes[lane] = card;
+  placeCard(state.piles, destination, card);
   state.turns++;
   if (player.played === TOTAL) state.winner = playerIndex;
   return card;
@@ -82,8 +102,8 @@ export function recycle(state, playerIndex, slot, now) {
 }
 
 export function retuneIfBlocked(state) {
-  if (state.winner !== null || state.players.some(player => legalMoves(player.hand, state.lanes).length)) return false;
-  state.lanes = tuneLanes(state);
+  if (state.winner !== null || state.players.some(player => legalMoves(player.hand, state.piles).length)) return false;
+  state.piles = tunePiles(state, state.piles.map(pile => pile.rule));
   state.retunes++;
   return true;
 }
@@ -108,44 +128,45 @@ export function reactionTime(playerIndex, difficulty, rhythm, random = Math.rand
   return Math.max(170, (profile.reaction + jitter + hesitation) * settings.pace * rhythm);
 }
 
-function project(hand, lanes, move) {
+function project(hand, piles, move) {
   const nextHand = [...hand];
-  const nextLanes = [...lanes];
-  nextLanes[move.lane] = nextHand[move.slot];
+  const nextPiles = [...piles];
+  placeCard(nextPiles, move.pile, nextHand[move.slot]);
   nextHand[move.slot] = null;
-  return { hand: nextHand, lanes: nextLanes };
+  return { hand: nextHand, piles: nextPiles };
 }
 
-function continuationScore(hand, lanes) {
-  const chances = legalMoves(hand, lanes);
+function continuationScore(hand, piles) {
+  const chances = legalMoves(hand, piles);
   const options = new Set(chances.map(move => move.slot)).size;
   const chain = chances.some(move => {
-    const next = project(hand, lanes, move);
-    return legalMoves(next.hand, next.lanes).length > 0;
+    const next = project(hand, piles, move);
+    return legalMoves(next.hand, next.piles).length > 0;
   });
-  return options * 2 + chances.length * 0.3 + (chain ? 1.6 : 0);
+  return options * 2 + Math.min(chances.length, 8) * 0.3 + (chain ? 1.6 : 0);
 }
 
-export function recycleSlot(hand, lanes) {
-  const blocked = hand.findIndex(card => card && !destinations(card, lanes).length);
+export function recycleSlot(hand, piles) {
+  const blocked = hand.findIndex(card => card && !destinations(card, piles).length);
   return blocked >= 0 ? blocked : hand.findIndex(Boolean);
 }
 
 export function chooseMove(state, playerIndex, difficulty, random = state.random) {
   const { hand, deck } = state.players[playerIndex];
-  const { lanes } = state;
-  const moves = legalMoves(hand, lanes);
-  if (!moves.length) return deck.length ? { recycle: recycleSlot(hand, lanes) } : null;
+  const { piles } = state;
+  const moves = legalMoves(hand, piles);
+  if (!moves.length) return deck.length ? { recycle: recycleSlot(hand, piles) } : null;
 
   const profile = PROFILES[playerIndex - 1];
   if (random() < profile.oversight * DIFFICULTIES[difficulty].error) {
-    return random() < 0.22 && deck.length ? { recycle: recycleSlot(hand, lanes) } : sample(moves, random);
+    return random() < 0.22 && deck.length ? { recycle: recycleSlot(hand, piles) } : sample(moves, random);
   }
 
   const ranked = moves.map(move => {
-    const next = project(hand, lanes, move);
-    const scarcity = 1 / destinations(hand[move.slot], lanes).length;
-    const score = continuationScore(next.hand, next.lanes) * profile.bias + scarcity + random() * 0.65;
+    const next = project(hand, piles, move);
+    const scarcity = 1 / destinations(hand[move.slot], piles).length;
+    const openCost = move.pile === NEW_PILE ? 0.6 : 0;
+    const score = continuationScore(next.hand, next.piles) * profile.bias + scarcity - openCost + random() * 0.65;
     return { move, score };
   });
   ranked.sort((a, b) => b.score - a.score);

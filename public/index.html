@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101c24">
+  <meta name="theme-color" content="#faf8ef">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="A real-time card race. Read the lanes and clear your deck first.">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="description" content="A real-time card race. Build shared piles and clear your deck first.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./assets/icon-192.png">
   <link rel="apple-touch-icon" href="./assets/icon-192.png">
@@ -62,13 +62,17 @@
           <button type="button" class="pause" id="pause" aria-label="Pause race">Ⅱ</button>
         </div>
         <section class="table" aria-labelledby="table-title">
-          <div class="table-heading"><h2 id="table-title">Shared lanes</h2><time id="clock" aria-label="Elapsed time">0:00</time></div>
-          <div class="lanes" id="lanes">
-            <button class="lane" type="button" data-lane="0"><span class="lane-title"><span aria-hidden="true">↑</span> Rise</span><span class="lane-card"></span><span class="lane-rule"></span></button>
-            <button class="lane" type="button" data-lane="1"><span class="lane-title"><span aria-hidden="true">＝</span> Match</span><span class="lane-card"></span><span class="lane-rule"></span></button>
-            <button class="lane" type="button" data-lane="2"><span class="lane-title"><span aria-hidden="true">↓</span> Fall</span><span class="lane-card"></span><span class="lane-rule"></span></button>
+          <div class="table-heading">
+            <div class="table-label"><h2 id="table-title">Shared piles</h2><span class="pile-count" id="pile-count" aria-label="Pile count"></span></div>
+            <time id="clock" aria-label="Elapsed time">0:00</time>
+            <button type="button" class="new-pile" id="new-pile" data-pile="-1"><span aria-hidden="true">+</span> New pile</button>
           </div>
-          <p class="status" id="status" role="status"></p>
+          <div class="piles" id="piles"></div>
+          <div class="pile-nav">
+            <button class="pile-arrow" id="pile-prev" type="button" aria-label="Previous piles" aria-controls="piles" disabled>‹</button>
+            <p class="status" id="status" role="status"></p>
+            <button class="pile-arrow" id="pile-next" type="button" aria-label="More piles" aria-controls="piles" disabled>›</button>
+          </div>
         </section>
         <section class="player" aria-labelledby="hand-title">
           <div class="hand-heading">
@@ -94,8 +98,9 @@
       <div><dt><span>＝</span> Match</dt><dd>Play the same symbol. Any number works.</dd></div>
       <div><dt><span>↓</span> Fall</dt><dd>Play one number lower. After 1 comes 6.</dd></div>
     </dl>
-    <p>Tap a highlighted card to play it. If several lanes fit, choose a lane. You can also drag a card directly onto a lane.</p>
-    <p>Select a card and tap <strong>Swap card</strong> to put it at the back of your deck and draw a new one. If nobody can play, the lanes reset.</p>
+    <p>Play a <strong>1</strong> to open a new pile. New piles cycle through Rise, Match, and Fall. Swipe the row or use the arrows to see more piles.</p>
+    <p>Tap a highlighted card to play it. If it fits in several places, choose a pile. You can also drag a card directly onto a pile.</p>
+    <p>Select a card and tap <strong>Swap card</strong> to trade it for your next card. If nobody can play, the tops of the piles reset.</p>
     <p class="credits">Suit icons by <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer">Lucide</a> under the <a href="./assets/LUCIDE-LICENSE.txt">ISC license</a>.</p>
   </dialog>
 
@@ -120,6 +125,7 @@
     <button class="ghost full" id="setup-again" type="button">Change setup</button>
   </dialog>
 
+  <template id="pile-template"><button class="pile" type="button"><span class="pile-title"><span class="pile-order" aria-hidden="true"></span><span class="pile-kind" aria-hidden="true"></span></span><span class="pile-card"></span><span class="pile-rule"></span></button></template>
   <script type="module" src="./main.js"></script>
 </body>
 </html>

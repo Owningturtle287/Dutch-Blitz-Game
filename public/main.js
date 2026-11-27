@@ -1,17 +1,18 @@
 import {
-  TOTAL, RANKS, destinations, legalMoves, newRace, play, recycle, recycleSlot,
+  TOTAL, NEW_PILE, OPEN_RANK, nextRank, destinations, legalMoves, newRace, play, recycle, recycleSlot,
   retuneIfBlocked, chooseMove, reactionTime,
 } from './engine.js';
 
 const $ = selector => document.querySelector(selector);
-const laneButtons = [...document.querySelectorAll('.lane')];
+const pileStrip = $('#piles');
+const newPileButton = $('#new-pile');
 const handButtons = [...document.querySelectorAll('.hand-card')];
 const rivals = [
   { name: 'Nova', color: '#b2def6' },
   { name: 'Sage', color: '#bfe3a2' },
   { name: 'Dash', color: '#ffc0a4' },
 ];
-const laneNames = ['Rise', 'Match', 'Fall'];
+const pileSymbols = { rise: '↑', match: '=', fall: '↓' };
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const scheme = matchMedia('(display-mode: standalone)');
 
@@ -115,36 +116,73 @@ function updateTiming() {
   $('#cycle').disabled = !player.deck.length || now < player.recycleAt || race.winner !== null;
 
   const card = player.hand[selected];
-  const targets = destinations(card, race.lanes);
+  const targets = destinations(card, race.piles);
   let hint = 'Tap a highlighted card to play it.';
-  if (card && targets.length) hint = 'Choose a highlighted lane.';
-  else if (card && player.deck.length) hint = 'Swap this card or wait for the lanes to change.';
-  else if (!legalMoves(player.hand, race.lanes).length) hint = player.deck.length ? 'No match? Swap a card to keep moving.' : 'Waiting for a lane to open…';
+  if (card && targets.length) hint = targets.includes(NEW_PILE) ? 'Choose a pile or open a new one.' : 'Choose a highlighted pile.';
+  else if (card && player.deck.length) hint = 'Swap this card or wait for the piles to change.';
+  else if (!legalMoves(player.hand, race.piles).length) hint = player.deck.length ? 'No match? Swap a card to keep moving.' : 'Waiting for a pile to open…';
   const status = message?.ends > now ? message.text : hint;
   if ($('#status').textContent !== status) $('#status').textContent = status;
 }
 
+function updatePileNavigation() {
+  $('#pile-prev').disabled = pileStrip.scrollLeft <= 1;
+  $('#pile-next').disabled = pileStrip.scrollLeft + pileStrip.clientWidth >= pileStrip.scrollWidth - 1;
+}
+
+function pileIsVisible(button) {
+  const { left, right } = button.getBoundingClientRect();
+  const bounds = pileStrip.getBoundingClientRect();
+  return left >= bounds.left - 1 && right <= bounds.right + 1;
+}
+
+function revealPile(button, animate = false) {
+  if (pileIsVisible(button)) return;
+  const left = pileStrip.scrollLeft + button.getBoundingClientRect().left - pileStrip.getBoundingClientRect().left;
+  pileStrip.scrollTo({ left, behavior: animate && !motion.matches ? 'smooth' : 'auto' });
+}
+
+function renderPiles(piles, targets) {
+  while (pileStrip.children.length > piles.length) pileStrip.lastElementChild.remove();
+  piles.forEach((pile, index) => {
+    let button = pileStrip.children[index];
+    if (!button) {
+      button = $('#pile-template').content.firstElementChild.cloneNode(true);
+      button.dataset.pile = index;
+      button.querySelector('.pile-order').textContent = index + 1;
+      const kind = document.createElement('span');
+      kind.className = 'pile-symbol';
+      kind.textContent = pileSymbols[pile.rule];
+      button.querySelector('.pile-kind').append(kind, ` ${capitalize(pile.rule)}`);
+      pileStrip.append(button);
+    }
+    const instruction = pile.rule === 'match' ? `${capitalize(pile.top.suit)} only` : `Play a ${nextRank(pile)}`;
+    showCard(button.querySelector('.pile-card'), pile.top);
+    button.querySelector('.pile-rule').textContent = instruction;
+    button.classList.toggle('target', targets.includes(index));
+    button.setAttribute('aria-label', `${capitalize(pile.rule)} pile ${index + 1}, ${cardName(pile.top)}. ${instruction}`);
+  });
+  $('#pile-count').textContent = piles.length;
+  newPileButton.classList.toggle('target', targets.includes(NEW_PILE));
+  updatePileNavigation();
+}
+
 function render() {
   const player = race.players[0];
-  const targets = destinations(player.hand[selected], race.lanes);
-  laneButtons.forEach((button, lane) => {
-    const top = race.lanes[lane];
-    const rule = lane === 1 ? `${capitalize(top.suit)} only` : `Play a ${lane === 0 ? top.rank % RANKS + 1 : (top.rank + RANKS - 2) % RANKS + 1}`;
-    showCard(button.querySelector('.lane-card'), top);
-    button.querySelector('.lane-rule').textContent = rule;
-    button.classList.toggle('target', targets.includes(lane));
-    button.setAttribute('aria-label', `${laneNames[lane]}, ${cardName(top)}. ${rule}`);
-  });
+  const targets = destinations(player.hand[selected], race.piles);
+  renderPiles(race.piles, targets);
+  newPileButton.classList.toggle('ready', selected === null && player.hand.some(card => card?.rank === OPEN_RANK));
 
   handButtons.forEach((button, slot) => {
     const card = player.hand[slot];
-    const options = destinations(card, race.lanes);
+    const options = destinations(card, race.piles);
     showCard(button, card);
     button.disabled = !card || race.winner !== null;
     button.classList.toggle('playable', options.length > 0);
     button.classList.toggle('selected', slot === selected);
     button.setAttribute('aria-pressed', String(slot === selected));
-    button.setAttribute('aria-label', card ? `${cardName(card)}${options.length ? `, playable on ${options.map(lane => laneNames[lane]).join(' or ')}` : ''}` : 'Empty slot');
+    const choices = options.map(index => index === NEW_PILE ? 'a new pile' : `pile ${index + 1}`);
+    button.setAttribute('aria-label', card ? `${cardName(card)}${choices.length ? `, playable on ${choices.join(' or ')}` : ''}` : 'Empty slot');
   });
 
   $('#remaining').textContent = `${TOTAL - player.played} left`;
@@ -156,19 +194,26 @@ function render() {
   updateTiming();
 }
 
-function applyPlay(player, slot, lane, cardId, from) {
+function applyPlay(player, slot, destination, cardId, from) {
   const source = player ? $(`[data-rival="${player}"]`) : handButtons[slot];
   const origin = from ?? source.getBoundingClientRect();
-  const card = play(race, player, slot, lane, cardId);
+  const opening = destination === NEW_PILE;
+  const index = opening ? race.piles.length : destination;
+  const card = play(race, player, slot, destination, cardId);
   if (!card) return false;
   if (!player) {
     selected = null;
     message = null;
+    if (opening) announce(`Opened pile ${index + 1}.`, 1000);
   }
   blockedAt = null;
   render();
-  carryCard(card, origin, laneButtons[lane].querySelector('.lane-card').getBoundingClientRect(), player !== 0);
-  playAnimation(laneButtons[lane], 'hit');
+  const target = pileStrip.children[index];
+  if (!player) revealPile(target);
+  if (pileIsVisible(target)) {
+    carryCard(card, origin, target.querySelector('.pile-card').getBoundingClientRect(), player !== 0);
+    playAnimation(target, 'hit');
+  }
   playAnimation(source, player ? 'is-playing' : 'drawn');
   if (race.winner !== null) finishRace();
   return true;
@@ -185,19 +230,19 @@ function tick() {
     }
     const move = chooseMove(race, bot.player, settings.difficulty);
     if (move && 'recycle' in move) recycle(race, bot.player, move.recycle, now);
-    else if (move) applyPlay(bot.player, move.slot, move.lane, race.players[bot.player].hand[move.slot].id);
+    else if (move) applyPlay(bot.player, move.slot, move.pile, race.players[bot.player].hand[move.slot].id);
     bot.next = now + reactionTime(bot.player, settings.difficulty, bot.rhythm);
     if (race.winner !== null) return;
   }
 
-  if (race.players.some(player => legalMoves(player.hand, race.lanes).length)) blockedAt = null;
+  if (race.players.some(player => legalMoves(player.hand, race.piles).length)) blockedAt = null;
   else {
     blockedAt ??= now;
     if (now - blockedAt > 1250 && retuneIfBlocked(race)) {
       blockedAt = null;
-      announce('Lanes reset. Look for a new match!');
+      announce('Piles reset. Look for a new match!');
       render();
-      laneButtons.forEach(button => playAnimation(button, 'hit'));
+      for (const button of pileStrip.children) if (pileIsVisible(button)) playAnimation(button, 'hit');
     }
   }
   updateTiming();
@@ -232,6 +277,8 @@ function startRace() {
   $('#arena').hidden = false;
   createRivals(settings.opponents);
   render();
+  pileStrip.scrollLeft = 0;
+  updatePileNavigation();
   resumeClock();
 }
 
@@ -272,28 +319,30 @@ function finishRace() {
   }, motion.matches ? 0 : 250);
 }
 
-function playFromHand(slot, lane, from) {
+function playFromHand(slot, pile, from) {
   if (!canPlay()) return;
   const card = race.players[0].hand[slot];
-  if (card && applyPlay(0, slot, lane, card.id, from)) return;
-  announce('That lane changed. Try another match.');
+  if (card && applyPlay(0, slot, pile, card.id, from)) return;
+  announce(pile === NEW_PILE ? 'Play a 1 to start a new pile.' : 'That card doesn’t fit here. Try another pile.');
   render();
 }
 
 function selectCard(slot) {
   if (!canPlay()) return;
   const card = race.players[0].hand[slot];
-  const options = destinations(card, race.lanes);
+  const options = destinations(card, race.piles);
   message = null;
   if (options.length === 1) return playFromHand(slot, options[0]);
   selected = selected === slot ? null : slot;
   render();
+  const matches = options.filter(index => index !== NEW_PILE).map(index => pileStrip.children[index]);
+  if (selected !== null && matches.length && !matches.some(pileIsVisible)) revealPile(matches[0], true);
 }
 
 function cancelDrag() {
   if (!drag) return;
   handButtons[drag.slot].classList.remove('dragging');
-  laneButtons.forEach(button => button.classList.remove('drag-over'));
+  $('.table .drag-over')?.classList.remove('drag-over');
   drag.ghost?.remove();
   drag = null;
 }
@@ -324,8 +373,10 @@ $('#hand').addEventListener('pointermove', event => {
   }
   drag.ghost.style.left = `${event.clientX - drag.ghost.offsetWidth / 2}px`;
   drag.ghost.style.top = `${event.clientY - drag.ghost.offsetHeight / 2}px`;
-  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('.lane.target');
-  laneButtons.forEach(button => button.classList.toggle('drag-over', button === target));
+  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-pile].target');
+  const previous = $('.table .drag-over');
+  if (previous !== target) previous?.classList.remove('drag-over');
+  target?.classList.add('drag-over');
 });
 
 $('#hand').addEventListener('pointerup', event => {
@@ -333,10 +384,10 @@ $('#hand').addEventListener('pointerup', event => {
   if (!drag.ghost) return cancelDrag();
   const { slot, ghost } = drag;
   const origin = ghost.getBoundingClientRect();
-  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('.lane');
+  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data-pile]');
   ignoreClicksUntil = performance.now() + 350;
   cancelDrag();
-  if (target) playFromHand(slot, Number(target.dataset.lane), origin);
+  if (target) playFromHand(slot, Number(target.dataset.pile), origin);
 });
 
 $('#hand').addEventListener('pointercancel', cancelDrag);
@@ -345,20 +396,36 @@ $('#hand').addEventListener('click', event => {
   const button = event.target.closest('.hand-card');
   if (button && (event.detail === 0 || performance.now() >= ignoreClicksUntil)) selectCard(Number(button.dataset.slot));
 });
-$('#lanes').addEventListener('click', event => {
-  const button = event.target.closest('.lane');
+$('.table').addEventListener('click', event => {
+  const button = event.target.closest('[data-pile]');
   if (!button || !canPlay()) return;
-  if (selected !== null) playFromHand(selected, Number(button.dataset.lane));
-  else {
+  const pile = Number(button.dataset.pile);
+  if (selected !== null) playFromHand(selected, pile);
+  else if (pile === NEW_PILE) {
+    const slot = race.players[0].hand.findIndex(card => card?.rank === OPEN_RANK);
+    if (slot >= 0) playFromHand(slot, pile);
+    else {
+      announce('Play a 1 to start a new pile.');
+      updateTiming();
+    }
+  } else {
     announce('Choose a card from your hand first.');
     updateTiming();
   }
 });
 
+pileStrip.addEventListener('scroll', updatePileNavigation, { passive: true });
+window.addEventListener('resize', updatePileNavigation);
+[['#pile-prev', -1], ['#pile-next', 1]].forEach(([selector, direction]) => {
+  $(selector).addEventListener('click', () => {
+    pileStrip.scrollBy({ left: direction * pileStrip.clientWidth, behavior: motion.matches ? 'auto' : 'smooth' });
+  });
+});
+
 $('#cycle').addEventListener('click', () => {
   if (!canPlay()) return;
   const player = race.players[0];
-  const slot = selected ?? recycleSlot(player.hand, race.lanes);
+  const slot = selected ?? recycleSlot(player.hand, race.piles);
   if (!recycle(race, 0, slot, timeNow())) return;
   selected = null;
   announce(`${cardName(player.hand[slot])} drawn.`, 800);

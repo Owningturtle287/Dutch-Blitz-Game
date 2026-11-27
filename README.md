@@ -1,14 +1,14 @@
 # Overcurrent
 
-Overcurrent is a mobile-first, real-time card race for one player and up to three computer rivals. Play all 24 cards before the others do. Everyone shares three lanes, each with its own rule.
+Overcurrent is a mobile-first, real-time card race for one player and up to three computer rivals. Play all 24 cards before the others do. The table starts with three shared piles.
 
-| Lane | Rule |
+| Pile | Rule |
 | --- | --- |
 | Rise | Play one number higher. After 6 comes 1. |
 | Match | Play the same symbol. Any number works. |
 | Fall | Play one number lower. After 1 comes 6. |
 
-Tap a highlighted card to play it. If multiple lanes fit, choose one. You can also drag a card straight to a lane. Swap a card when your hand gets stuck. The lanes reset when nobody can play.
+Tap a highlighted card to play it. If it fits in several places, choose a pile. A 1 can start a new pile, and the game sets no pile limit. New piles cycle through Rise, Match, and Fall. Swipe the row or use the arrows to browse. Swap a card when your hand gets stuck. The tops of the piles reset when nobody can play.
 
 ## Play and install
 
