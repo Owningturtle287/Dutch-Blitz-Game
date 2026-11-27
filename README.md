@@ -11,6 +11,12 @@ Overcurrent is a landscape, real-time card race for one player and up to three c
 
 You sit at the bottom of the table. Tap or drag a face-up card or the exposed Wood card. Settings can enable any-color runs, same-color matches, and descending plays for the next round.
 
+## Games and levels
+
+Enter a player name and choose the difficulty, number of players, and number of rounds. Scores add up across a game. Free Play starts every round at zero and awards XP for that round's placement instead.
+
+First through fourth place award 100, 75, 50, and 25 XP. Level 1 takes 100 XP, level 2 takes another 200 XP, and each level after that costs 100 XP more. Progress follows the entered name in the current browser.
+
 ## Play and install
 
 The [GitHub Pages site](https://owningturtle287.github.io/Dutch-Blitz-Game/) is published by the [Pages workflow](../../actions/workflows/pages.yml). Pushes to `main` deploy automatically.

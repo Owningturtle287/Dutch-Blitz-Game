@@ -35,23 +35,41 @@
           <h1 id="lobby-title">Call<br> Blitz<span>.</span></h1>
           <p>Race to empty your Blitz pile. Build shared piles in order and color.</p>
           <form id="setup">
-            <fieldset>
-              <legend>Opponents</legend>
+            <div class="profile-setup">
+              <label class="field-label" for="profile-name">Player name</label>
+              <div class="name-entry">
+                <input class="text-field" type="text" id="profile-name" name="playerName" list="profile-names" maxlength="24" required autocomplete="off" autocapitalize="words">
+                <datalist id="profile-names"></datalist>
+                <button type="button" class="ghost" id="profiles">Profiles</button>
+              </div>
+              <div class="xp-meter" id="setup-progress" hidden>
+                <div><strong class="profile-level"></strong><span class="profile-xp"></span></div>
+                <progress aria-label="Level progress"></progress>
+              </div>
+            </div>
+            <fieldset class="player-setting">
+              <legend>Players</legend>
               <div class="segments">
-                <label><input type="radio" name="opponents" value="1"><span>1</span></label>
-                <label><input type="radio" name="opponents" value="2"><span>2</span></label>
-                <label><input type="radio" name="opponents" value="3" checked><span>3</span></label>
+                <label><input type="radio" name="players" value="2"><span>2</span></label>
+                <label><input type="radio" name="players" value="3"><span>3</span></label>
+                <label><input type="radio" name="players" value="4" checked><span>4</span></label>
               </div>
             </fieldset>
-            <fieldset>
-              <legend>Pace</legend>
+            <fieldset class="difficulty-setting">
+              <legend>Difficulty</legend>
               <div class="segments">
                 <label><input type="radio" name="difficulty" value="relaxed"><span>Relaxed</span></label>
                 <label><input type="radio" name="difficulty" value="quick" checked><span>Quick</span></label>
                 <label><input type="radio" name="difficulty" value="expert"><span>Expert</span></label>
               </div>
             </fieldset>
-            <button class="primary start" type="submit">Start round <span aria-hidden="true">→</span></button>
+            <div class="round-setting">
+              <label class="field-label rounds-label" for="rounds">Rounds
+                <input class="text-field" type="number" id="rounds" name="rounds" min="1" value="3" required>
+              </label>
+              <label class="free-label"><input type="checkbox" id="free-play" name="freePlay"> Free Play</label>
+            </div>
+            <button class="primary start" type="submit">Start game <span aria-hidden="true">→</span></button>
           </form>
         </div>
       </section>
@@ -61,7 +79,7 @@
         <section class="table" aria-labelledby="table-title">
           <div class="table-heading">
             <div class="table-label"><h2 id="table-title">Shared piles</h2><span class="pile-count" id="pile-count" aria-label="Pile count"></span></div>
-            <time id="clock" aria-label="Elapsed time">0:00</time>
+            <div class="table-meta"><span id="match-round"></span><time id="clock" aria-label="Elapsed time">0:00</time></div>
           </div>
           <button type="button" class="new-pile" id="new-pile" data-pile="-1"><span aria-hidden="true">+</span> New pile</button>
           <div class="piles" id="piles"></div>
@@ -84,9 +102,15 @@
       <li>Play a <strong>1</strong> to open a shared pile. By default, each next card must be one number higher and the same color. A 10 played on a 9 goes face down and closes the pile.</li>
       <li>Tap or drag one of your three face-up cards. The top Blitz card fills the space it leaves. Playing the last Blitz card into that space ends the round.</li>
       <li>Tap your Wood pile to flip up to three cards. Play the exposed card to uncover the next one in that group. You can wait for a match or flip again. When the stock runs out, the unplayed Wood cards are shuffled for the next pass.</li>
-      <li>Score one point per card you played to the table and lose two points per card left in your Blitz pile.</li>
+      <li>Score one point per card played to the table and lose two points per card left in Blitz. A game adds up scores over its chosen rounds. Free Play scores each round on its own.</li>
     </ul>
     <p class="credits">Suit icons by <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer">Lucide</a> under the <a href="./assets/LUCIDE-LICENSE.txt">ISC license</a>.</p>
+  </dialog>
+
+  <dialog id="profiles-dialog" aria-labelledby="profiles-title">
+    <form method="dialog" class="dialog-top"><h2 id="profiles-title">Player profiles</h2><button class="close" aria-label="Close profiles">×</button></form>
+    <p>Names and progress are saved in this browser.</p>
+    <div class="profile-list" id="profile-list"></div>
   </dialog>
 
   <dialog id="settings-dialog" aria-labelledby="settings-title">
@@ -115,12 +139,49 @@
   </dialog>
 
   <dialog id="finish-dialog" aria-labelledby="finish-title">
-    <div class="dialog-top"><h2 id="finish-title"></h2></div>
+    <header class="result-head">
+      <div><span class="result-round" id="result-round"></span><h2 id="finish-title"></h2></div>
+      <button class="ghost" type="button" id="skip-tally">Skip count</button>
+    </header>
     <p id="finish-summary"></p>
-    <ol id="standings" class="standings"></ol>
-    <button class="primary full" id="rematch" type="button">Next round <span aria-hidden="true">→</span></button>
-    <button class="ghost full" id="setup-again" type="button">Change setup</button>
+    <section class="score-board" aria-label="Scorecard">
+      <header class="tally-head">
+        <span class="tally-packet" id="tally-packet" aria-hidden="true"></span>
+        <div><strong id="tally-phase" aria-live="polite"></strong><span id="tally-detail"></span></div>
+      </header>
+      <ol id="standings" class="standings"></ol>
+    </section>
+    <div class="result-progress" id="result-progress" hidden>
+      <strong id="result-xp"></strong>
+      <div class="xp-meter">
+        <div><strong class="profile-level"></strong><span class="profile-xp"></span></div>
+        <progress aria-label="Level progress"></progress>
+      </div>
+    </div>
+    <div class="result-actions" id="result-actions" hidden>
+      <button class="primary" id="rematch" type="button"><strong id="next-label">Next round</strong><span aria-hidden="true">→</span></button>
+      <button class="ghost" id="setup-again" type="button">Change setup</button>
+    </div>
   </dialog>
+
+  <template id="score-row-template">
+    <li class="score-row">
+      <span class="tally-stock" aria-hidden="true"></span>
+      <div class="score-person"><strong class="score-name"></strong><small class="score-breakdown"></small></div>
+      <div class="score-number"><strong class="score-round"></strong><small>Round</small></div>
+      <div class="score-number game-score" hidden><strong class="score-total"></strong><small>Game</small></div>
+    </li>
+  </template>
+
+  <template id="profile-template">
+    <button class="profile-choice" type="button">
+      <strong class="saved-name"></strong>
+      <span class="xp-meter">
+        <span><strong class="profile-level"></strong><span class="profile-xp"></span></span>
+        <progress aria-label="Level progress"></progress>
+      </span>
+    </button>
+  </template>
 
   <template id="card-template">
     <span class="card-face" aria-hidden="true">

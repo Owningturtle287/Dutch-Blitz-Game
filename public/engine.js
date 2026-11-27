@@ -26,7 +26,7 @@ export function newRace(count, random = Math.random, rules = DEFAULT_RULES) {
   const tools = shuffled(DECK_TOOLS, random).slice(0, count);
   const players = tools.map((tool, player) => {
     const pack = SUITS.flatMap(suit => Array.from({ length: RANKS }, (_, index) => ({
-      id: `${player}-${suit}-${index + 1}`, suit, rank: index + 1, tool,
+      id: `${player}-${suit}-${index + 1}`, suit, rank: index + 1, tool, owner: player,
     })));
     const wood = shuffled(pack, random);
     const blitz = wood.splice(0, BLITZ_SIZE);
