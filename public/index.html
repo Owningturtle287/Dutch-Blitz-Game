@@ -12,17 +12,16 @@
   <link rel="apple-touch-icon" href="./assets/icon-192.png">
   <link rel="preload" as="image" href="./assets/card-hand.webp">
   <link rel="stylesheet" href="./style.css">
-  <title>Overcurrent</title>
+  <title>Dutch Blitz</title>
 </head>
 <body>
   <div class="app">
     <header class="masthead">
-      <div class="wordmark"><span class="brand-mark" aria-hidden="true">ϟ</span> Overcurrent<span class="brand-dot">.</span></div>
+      <div class="wordmark"><span class="brand-mark" aria-hidden="true">ϟ</span> Dutch Blitz</div>
       <nav aria-label="Game controls">
-        <button class="ghost pause" id="pause" type="button" hidden>Pause</button>
         <button class="ghost" id="install" type="button">Install <span aria-hidden="true">↗</span></button>
-        <button class="ghost" id="settings" type="button">Settings</button>
-        <button class="ghost" id="help" type="button" aria-label="How to play">Rules <span aria-hidden="true">?</span></button>
+        <button class="ghost" id="lobby-settings" type="button">Settings</button>
+        <button class="ghost" id="lobby-rules" type="button" aria-label="How to play">Rules <span aria-hidden="true">?</span></button>
       </nav>
     </header>
 
@@ -32,7 +31,7 @@
           <div class="art-orbit"></div>
         </div>
         <div class="lobby-copy">
-          <h1 id="lobby-title">Call<br> Blitz<span>.</span></h1>
+          <h1 id="lobby-title">Dutch<br> <span>Blitz</span></h1>
           <p>Race to empty your Blitz pile. Build shared piles in order and color.</p>
           <form id="setup">
             <div class="profile-setup">
@@ -75,20 +74,33 @@
       </section>
 
       <section class="arena" id="arena" aria-label="Race table" hidden>
-        <p class="orientation-hint">Rotate for a wider view of the table.</p>
         <section class="table" aria-labelledby="table-title">
           <div class="table-heading">
             <div class="table-label"><h2 id="table-title">Shared piles</h2><span class="pile-count" id="pile-count" aria-label="Pile count"></span></div>
             <div class="table-meta"><span id="match-round"></span><time id="clock" aria-label="Elapsed time">0:00</time></div>
           </div>
-          <button type="button" class="new-pile" id="new-pile" data-pile="-1"><span aria-hidden="true">+</span> New pile</button>
+          <p class="orientation-hint">Rotate for a wider view.</p>
           <div class="piles" id="piles"></div>
           <p class="empty-table" id="empty-table" hidden>Play a 1 to open a pile.</p>
           <div class="round-countdown" id="countdown" role="timer" aria-label="Time until the round starts" hidden>
             <span>Starting in</span>
             <strong id="countdown-value">10</strong>
           </div>
-          <p class="status" id="status" role="status"></p>
+          <div class="play-controls">
+            <button type="button" class="new-pile" id="new-pile" data-pile="-1"><span aria-hidden="true">+</span> New pile</button>
+            <p class="status" id="status" role="status"></p>
+          </div>
+          <nav class="table-controls" aria-label="Table controls">
+            <button class="table-control" id="pause" type="button" aria-label="Pause" title="Pause">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 6v12m8-12v12" stroke-width="3"/></svg>
+            </button>
+            <button class="table-control" id="settings" type="button" aria-label="Settings" title="Settings">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h6m4 0h6M4 12h10m4 0h2M4 18h3m4 0h9m-8-14v4m4 2v4m-7 2v4"/></svg>
+            </button>
+            <button class="table-control" id="help" type="button" aria-label="How to play" title="Rules">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 7C9 4.5 5.4 5 3 6v13c3-1.5 6.6-1.1 9 1 2.4-2.1 6-2.5 9-1V6c-2.4-1-6-1.5-9 1Zm0 0v13M6.5 9.5l2 .2m-2 3 2 .4m7-3.4 2-.2m-2 3.4 2-.4"/></svg>
+            </button>
+          </nav>
           <div id="seats" class="seats"></div>
         </section>
       </section>
@@ -104,7 +116,6 @@
       <li>Tap your Wood pile to flip up to three cards. Play the exposed card to uncover the next one in that group. You can wait for a match or flip again. When the stock runs out, the unplayed Wood cards are shuffled for the next pass.</li>
       <li>Score one point per card played to the table and lose two points per card left in Blitz. A game adds up scores over its chosen rounds. Free Play scores each round on its own.</li>
     </ul>
-    <p class="credits">Suit icons by <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer">Lucide</a> under the <a href="./assets/LUCIDE-LICENSE.txt">ISC license</a>.</p>
   </dialog>
 
   <dialog id="profiles-dialog" aria-labelledby="profiles-title">
@@ -128,7 +139,7 @@
     <form method="dialog" class="dialog-top"><h2 id="install-title">Add to home screen</h2><button class="close" aria-label="Close install instructions">×</button></form>
     <p><strong>iPhone and iPad</strong><br>Open this link in Safari, tap Share, then tap Add to Home Screen.</p>
     <p><strong>Android</strong><br>In Chrome, open the menu and choose Add to home screen or Install app.</p>
-    <p>Open the Overcurrent icon to play. After the first visit loads, the game also works offline.</p>
+    <p>Open the Dutch Blitz icon to play. After the first visit loads, the game also works offline.</p>
   </dialog>
 
   <dialog id="pause-dialog" aria-labelledby="pause-title">
@@ -148,6 +159,7 @@
       <header class="tally-head">
         <span class="tally-packet" id="tally-packet" aria-hidden="true"></span>
         <div><strong id="tally-phase" aria-live="polite"></strong><span id="tally-detail"></span></div>
+        <span class="tally-progress" id="tally-progress" aria-hidden="true"></span>
       </header>
       <ol id="standings" class="standings"></ol>
     </section>
@@ -168,7 +180,9 @@
     <li class="score-row">
       <span class="tally-stock" aria-hidden="true"></span>
       <div class="score-person"><strong class="score-name"></strong><small class="score-breakdown"></small></div>
-      <div class="score-number"><strong class="score-round"></strong><small>Round</small></div>
+      <div class="score-number">
+        <strong class="score-round"></strong><small>Round</small><span class="score-delta" aria-hidden="true"></span>
+      </div>
       <div class="score-number game-score" hidden><strong class="score-total"></strong><small>Game</small></div>
     </li>
   </template>
@@ -187,7 +201,6 @@
     <span class="card-face" aria-hidden="true">
       <svg class="card-ornament" viewBox="0 0 100 140" focusable="false"><use href="./assets/card-art.svg#face" /></svg>
       <span class="card-rank"></span>
-      <span class="suit-icon"></span>
       <span class="card-corner"></span>
     </span>
   </template>

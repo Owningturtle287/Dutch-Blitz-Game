@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Overcurrent",
-  "short_name": "Overcurrent",
+  "name": "Dutch Blitz",
+  "short_name": "Dutch Blitz",
   "description": "A real-time card race. Empty your Blitz pile first.",
   "start_url": "./",
   "scope": "./",

@@ -1,6 +1,6 @@
-# Overcurrent
+# Dutch Blitz
 
-Overcurrent is a landscape, real-time card race for one player and up to three computer rivals. Each racer starts with a different 40-card tool deck, arranged into a 27-card Wood pile, three face-up cards, and a 10-card Blitz pile. Play begins after a 10-second countdown.
+Dutch Blitz is a landscape, real-time card race for one player and up to three computer rivals. Each racer starts with a different 40-card tool deck, arranged into a 27-card Wood pile, three face-up cards, and a 10-card Blitz pile. Play begins after a 10-second countdown.
 
 ## Round rules
 
@@ -26,5 +26,3 @@ On iPhone or iPad, open the site in Safari and tap **Share → Add to Home Scree
 ## Develop
 
 Serve `public` with a local web server such as `python3 -m http.server 8000 --directory public`. Run the engine checks with `node --test`.
-
-Suit pictograms come from [Lucide](https://lucide.dev/) under the [ISC license](public/assets/LUCIDE-LICENSE.txt).
