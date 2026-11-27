@@ -11,7 +11,7 @@ Dutch Blitz is a landscape, real-time card race for one player and up to three c
 
 You sit at the bottom of the table. Drag a face-up card or the exposed Wood card onto the table to play it on the nearest eligible pile. You can also tap a 1 to open a pile. Settings can enable any-color runs, same-color matches, and descending plays for the next round.
 
-Rivals inspect one card or pile at a time and remember what they have seen. Unsuccessful Wood draws, long stretches without clearing Blitz cards, and contested plays increase their visible stress. Their names stay with the game across rounds.
+Rivals inspect one card or pile at a time, miss some plays outside their focus, and recheck piles when their memory gets stale. Unsuccessful Wood draws, long stretches without clearing Blitz cards, and contested plays increase their visible stress. Quick and Expert look and react faster than Standard and are more likely to set up follow-on plays. Rival names and voices stay with the game across rounds. Spoken dialogue and card sounds each have their own setting.
 
 ## Games and levels
 

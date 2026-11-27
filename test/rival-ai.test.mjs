@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newRace, WOOD_CARD, NEW_PILE, flipWood } from '../public/engine.js';
 import { newRival, noticePileChange, settleRivalPlay, stepRival } from '../public/rival-ai.js';
-import { chooseRivalNames } from '../public/rival-names.js';
+import { chooseRivalNames, voiceForName } from '../public/rival-names.js';
 
 const card = (rank, suit = 'spark') => ({ id: `${suit}-${rank}`, rank, suit });
 const stack = top => ({ cards: [top], closed: false });
 const steady = () => .5;
+const observed = (rank, suit) => ({ top: card(rank, suit), at: 0 });
 
 function setup(piles = [], posts = [card(7), card(8), card(9)]) {
   const race = newRace(2, steady);
@@ -24,14 +25,16 @@ test('a Wood flip must settle and the exposed card needs a separate look before 
   rival.posts = [];
   assert.deepEqual(stepRival(rival, race, 0), { kind: 'flip' });
   assert.equal(flipWood(race, 1).at(-1).rank, 1);
-  assert.equal(stepRival(rival, race, 339), null);
+  const flippedAt = rival.next;
+  assert.equal(stepRival(rival, race, flippedAt - 1), null);
   assert.equal(rival.focus, null);
-  stepRival(rival, race, 340);
+  stepRival(rival, race, flippedAt);
   assert.deepEqual(rival.focus, { kind: 'card', source: WOOD_CARD });
-  assert.equal(rival.next, 840);
-  stepRival(rival, race, 839);
+  const inspectedAt = rival.next;
+  assert.ok(inspectedAt - flippedAt > 400);
+  stepRival(rival, race, inspectedAt - 1);
   assert.equal(rival.cards.has(WOOD_CARD), false);
-  stepRival(rival, race, 840);
+  stepRival(rival, race, inspectedAt);
   assert.equal(rival.focus.kind, 'play');
   assert.equal(rival.focus.pile, NEW_PILE);
   assert.equal(stepRival(rival, race, rival.next).cardId, 'spark-1');
@@ -53,11 +56,11 @@ test('rivals look at each of their three posts and one pile at a time without re
     assert.deepEqual(reads, []);
   }
   assert.equal(rival.focus.kind, 'pile');
-  stepRival(rival, race, 2000);
+  stepRival(rival, race, rival.next);
   assert.equal(reads.length, 1);
   for (let clock = 2050; clock < 8000; clock += 50) stepRival(rival, race, clock);
   assert.deepEqual([...reads].sort(), [0, 1, 2]);
-  noticePileChange(rival, 1, 0, 8000);
+  noticePileChange(rival, 1, 0, 8000, 0);
   for (let clock = 8000; clock < 9000; clock += 50) stepRival(rival, race, clock);
   assert.deepEqual(reads.slice(3), [1]);
 });
@@ -66,8 +69,8 @@ test('nearby ranks bias the scan without exposing the current pile tops', () => 
   const { race, rival } = setup([stack(card(5)), stack(card(1))]);
   rival.posts = [];
   rival.cards.set(0, card(6));
-  rival.piles.set(0, card(5));
-  rival.piles.set(1, card(1));
+  rival.piles.set(0, observed(5));
+  rival.piles.set(1, observed(1));
   rival.unread = new Set([0, 1]);
   rival.random = () => .6;
   stepRival(rival, race, 0);
@@ -90,7 +93,7 @@ test('unsuccessful Wood, slow Blitz progress and contested moves raise visible s
   noticePileChange(rival, 0, 0, 25000);
   assert.ok(rival.focus.contested);
   assert.equal(rival.stress, 82.1);
-  assert.match(rival.speech.text, /Shit|Goddammit|I had that/);
+  assert.match(rival.speech.text, /Shit|Damn it|crap|cursed|got there first/);
   noticePileChange(rival, 0, 0, 25010);
   assert.equal(rival.stress, 82.1);
   settleRivalPlay(rival, { source: 0, pile: 0 }, true, false, 25500);
@@ -103,9 +106,9 @@ test('ordinary slips stay close in rank and in the correct color', () => {
   rival.pileCount = 3;
   rival.posts = [];
   rival.cards.set(0, card(6));
-  rival.piles.set(0, card(5));
-  rival.piles.set(1, card(4));
-  rival.piles.set(2, card(5, 'ember'));
+  rival.piles.set(0, observed(5));
+  rival.piles.set(1, observed(4));
+  rival.piles.set(2, observed(5, 'ember'));
   rival.random = () => .028;
 
   stepRival(rival, race, 0);
@@ -126,9 +129,9 @@ test('even at maximum stress mismatched colors need a very rare roll', () => {
   rival.pileCount = 3;
   rival.posts = [];
   rival.cards.set(0, card(6));
-  rival.piles.set(0, card(5));
-  rival.piles.set(1, card(5, 'ember'));
-  rival.piles.set(2, card(2, 'ember'));
+  rival.piles.set(0, observed(5));
+  rival.piles.set(1, observed(5, 'ember'));
+  rival.piles.set(2, observed(2, 'ember'));
   rival.stress = 100;
   rival.random = () => .005;
   stepRival(rival, race, 0);
@@ -149,4 +152,25 @@ test('there are hundreds of unique names and a new roster can exclude the old on
   const next = chooseRivalNames(3, old, steady);
   assert.equal(next.length, 3);
   assert.ok(next.every(name => !old.includes(name)));
+  assert.ok(pool.every(name => ['male', 'female'].includes(voiceForName(name))));
+  assert.equal(voiceForName('Clara'), 'female');
+  assert.equal(voiceForName(' Johann '), 'male');
+});
+
+test('a far-away play can go unnoticed and an old remembered match takes a fresh look', () => {
+  const { race, rival } = setup([stack(card(5))]);
+  rival.pileCount = 1;
+  rival.posts = [];
+  rival.cards.set(0, card(6));
+  rival.piles.set(0, observed(5));
+  rival.focus = { kind: 'card', source: WOOD_CARD };
+  noticePileChange(rival, 0, 0, 3000, 1);
+  assert.equal(rival.unread.has(0), false);
+  race.piles[0].cards.push(card(6));
+  stepRival(rival, race, 6000);
+  assert.equal(rival.focus.kind, 'pile');
+  assert.equal(rival.piles.get(0).top.rank, 5);
+  stepRival(rival, race, rival.next);
+  assert.equal(rival.piles.get(0).top.rank, 6);
+  assert.notEqual(rival.focus?.kind, 'play');
 });

@@ -57,8 +57,8 @@
             <fieldset class="difficulty-setting">
               <legend>Difficulty</legend>
               <div class="segments">
-                <label><input type="radio" name="difficulty" value="relaxed"><span>Relaxed</span></label>
-                <label><input type="radio" name="difficulty" value="quick" checked><span>Quick</span></label>
+                <label><input type="radio" name="difficulty" value="standard" checked><span>Standard</span></label>
+                <label><input type="radio" name="difficulty" value="quick"><span>Quick</span></label>
                 <label><input type="radio" name="difficulty" value="expert"><span>Expert</span></label>
               </div>
             </fieldset>
@@ -102,6 +102,7 @@
             </button>
           </nav>
           <div id="seats" class="seats"></div>
+          <div id="blitz-call" class="blitz-call" role="status" hidden><strong>Blitz!</strong><small></small></div>
         </section>
       </section>
     </main>
@@ -132,6 +133,7 @@
       <label><input type="checkbox" name="sameColor"><span><strong>Same-color matches</strong><small>Allow any number if the color matches.</small></span></label>
       <label><input type="checkbox" name="descending"><span><strong>Descending plays</strong><small>Also allow a card one number lower.</small></span></label>
       <label><input type="checkbox" name="sound" checked><span><strong>Sound effects</strong><small>Card flips, placement, and shuffles.</small></span></label>
+      <label><input type="checkbox" name="voices" checked><span><strong>Spoken dialogue</strong><small>Blitz calls and rival reactions, including occasional swearing.</small></span></label>
       <button class="primary full" type="submit">Save settings</button>
     </form>
   </dialog>

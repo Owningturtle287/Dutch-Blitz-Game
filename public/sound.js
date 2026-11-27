@@ -1,3 +1,5 @@
+import { DIALOGUE } from './dialogue.js';
+
 const effects = {
   flip: ['flip-1', 'flip-2'],
   fan: ['fan'],
@@ -6,13 +8,19 @@ const effects = {
 };
 
 let enabled = true;
+let voiceEnabled = true;
 let context;
 let output;
+let voiceOutput;
+let voiceSource;
+const voiceNames = ['male', 'female'];
+const voiceLines = Object.keys(DIALOGUE);
+const voiceSlot = 2.25;
 let playback = 0;
 const clips = new Map();
 
 async function loadClips() {
-  await Promise.all(Object.values(effects).flat().map(async name => {
+  await Promise.all([...Object.values(effects).flat(), ...voiceNames.map(voice => `voice-${voice}`)].map(async name => {
     try {
       const response = await fetch(`./assets/audio/${name}.mp3`);
       if (!response.ok) return;
@@ -27,20 +35,57 @@ export function setSoundEnabled(value) {
   if (output) output.gain.setTargetAtTime(enabled ? .73 : 0, context.currentTime, .015);
 }
 
+export function setVoicesEnabled(value) {
+  voiceEnabled = value;
+  if (!value && voiceSource) {
+    voiceSource.stop();
+    voiceSource = null;
+  }
+}
+
 export function unlockSounds() {
-  if (!enabled) return;
+  if (!enabled && !voiceEnabled) return;
   try {
     if (!context) {
       const AudioContext = window.AudioContext ?? window.webkitAudioContext;
       if (!AudioContext) return;
       context = new AudioContext();
       output = context.createGain();
-      output.gain.value = .73;
+      output.gain.value = enabled ? .73 : 0;
       output.connect(context.destination);
+      voiceOutput = context.createGain();
+      voiceOutput.gain.value = .83;
+      voiceOutput.connect(context.destination);
       loadClips();
     }
     if (context.state !== 'running') context.resume().catch(() => {});
   } catch { /* Gameplay stays available when audio is blocked. */ }
+}
+
+export function playVoice(line, voice, { pan = 0, delay = 0 } = {}) {
+  if (!voiceEnabled || !voiceOutput || context.state !== 'running') return;
+  const buffer = clips.get(`voice-${voice}`);
+  const index = voiceLines.indexOf(line);
+  if (!buffer || index === -1) return;
+  if (voiceSource && line !== 'blitz') return;
+  voiceSource?.stop();
+  const source = context.createBufferSource();
+  source.buffer = buffer;
+  voiceSource = source;
+  const panner = pan && context.createStereoPanner ? context.createStereoPanner() : null;
+  if (panner) {
+    panner.pan.value = pan;
+    source.connect(panner);
+    panner.connect(voiceOutput);
+  } else {
+    source.connect(voiceOutput);
+  }
+  source.onended = () => {
+    source.disconnect();
+    panner?.disconnect();
+    if (voiceSource === source) voiceSource = null;
+  };
+  source.start(context.currentTime + delay / 1000, index * voiceSlot, voiceSlot);
 }
 
 export function playSound(effect, { level = 1, delay = 0, pan = 0 } = {}) {

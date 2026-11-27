@@ -5,14 +5,15 @@ import {
 import { newMatch, recordRound, levelProgress } from './match.js';
 import { createProfileStore, normalizeName } from './profiles.js';
 import { showTally } from './tally.js';
-import { playSound, setSoundEnabled, unlockSounds } from './sound.js';
+import { playSound, playVoice, setSoundEnabled, setVoicesEnabled, unlockSounds } from './sound.js';
 import { newRival, noticePileChange, settleRivalPlay, stepRival } from './rival-ai.js';
-import { chooseRivalNames } from './rival-names.js';
+import { chooseRivalNames, voiceForName } from './rival-names.js';
 
 const $ = selector => document.querySelector(selector);
 const table = $('.table');
 const pileGrid = $('#piles');
 const newPileButton = $('#new-pile');
+const blitzCall = $('#blitz-call');
 const cardTemplate = $('#card-template').content.firstElementChild;
 const backTemplate = $('#back-template').content.firstElementChild;
 const seatTemplate = $('#seat-template').content.firstElementChild;
@@ -29,7 +30,8 @@ const seating = [
 ];
 const ROUND_DELAY = 10000;
 const seatPan = [0, 0, -.38, .38];
-const BLITZ_HOLD = 1500;
+const BLITZ_HOLD = 2050;
+let blitzAnimation;
 
 let race;
 let match;
@@ -66,7 +68,9 @@ function browserStorage() {
 
 const profiles = createProfileStore(browserStorage());
 let soundsOn = readSetting('sound', true) !== false;
+let voicesOn = readSetting('voices', true) !== false;
 setSoundEnabled(soundsOn);
+setVoicesEnabled(voicesOn);
 document.addEventListener('pointerdown', unlockSounds, { capture: true, passive: true });
 document.addEventListener('keydown', unlockSounds, { capture: true });
 const racerName = index => index === 0 ? match.settings.name : match.rivalNames[index - 1];
@@ -208,7 +212,7 @@ function createSeats() {
       element.querySelector('.wood-label').addEventListener('click', flip);
     }
     return {
-      element, slots, stock, blitz, angle, stress, meter,
+      element, slots, stock, blitz, angle, stress, meter, voice: voiceForName(name) ?? 'male',
       stressValue: stress.querySelector('strong'), bubble: element.querySelector('.seat-bubble'),
       bubbleText: '', bubbleAnimation: null, looking: null,
       points: element.querySelector('.seat-score'),
@@ -376,6 +380,11 @@ function slotRect(button) {
   return (button.firstElementChild ?? button).getBoundingClientRect();
 }
 
+function centerOf(element) {
+  const { left, top, width, height } = element.getBoundingClientRect();
+  return { x: left + width / 2, y: top + height / 2 };
+}
+
 function revealOnArrival(face, duration, delay = 0) {
   if (!motion.matches) {
     face.animate([{ opacity: 0 }, { opacity: 0, offset: .8 }, { opacity: 1 }], { delay, duration, fill: 'backwards' });
@@ -397,13 +406,21 @@ function applyPlay(player, source, destination, cardId, from) {
   const card = play(race, player, source, destination, cardId);
   if (!card) return false;
   const now = timeNow();
-  bots.forEach(bot => noticePileChange(bot, index, player, now));
   if (player === 0) {
     selected = null;
     message = null;
     if (opening) announce(`Opened pile ${index + 1}.`);
   }
   render();
+  const changed = centerOf(pileGrid.children[index]);
+  const view = pileGrid.getBoundingClientRect();
+  for (const bot of bots) {
+    const gaze = pileGrid.children[bot.focus?.pile ?? bot.glance] ?? seats[bot.player].element;
+    const point = centerOf(gaze);
+    const distance = Math.min(1, Math.hypot((changed.x - point.x) / Math.max(1, view.width),
+      (changed.y - point.y) / Math.max(1, view.height)));
+    noticePileChange(bot, index, player, now, distance);
+  }
   const pile = race.piles[index];
   const target = pileGrid.children[index].querySelector('.pile-card').lastElementChild;
   const duration = 350;
@@ -451,22 +468,21 @@ function turnWood(player) {
   revealTransfer(top, origin, receiver, { delay: (drawn.length - 1) * 55, duration: 280, angle: seat.angle });
 }
 
-function showBubble(seat, text = '', blitz = false) {
+function showBubble(seat, text = '') {
   if (seat.bubbleText === text) return;
   const { bubble } = seat;
   seat.bubbleText = text;
   seat.bubbleAnimation?.cancel();
 
   if (text) {
-    bubble.classList.toggle('blitz-call', blitz);
     bubble.textContent = text;
     bubble.hidden = false;
     if (motion.matches) return;
     seat.bubbleAnimation = bubble.animate([
-      { opacity: 0, translate: '0 5px', scale: .92 },
-      { opacity: 1, translate: '0 -1px', scale: 1.015, offset: .73 },
+      { opacity: 0, translate: '0 11px', scale: .78 },
+      { opacity: 1, translate: '0 -2px', scale: 1.035, offset: .74 },
       { opacity: 1, translate: '0 0', scale: 1 },
-    ], { duration: 245, easing: 'cubic-bezier(.18,.72,.32,1)' });
+    ], { duration: 325, easing: 'cubic-bezier(.18,.72,.32,1)' });
   } else if (motion.matches) {
     bubble.hidden = true;
     bubble.textContent = '';
@@ -483,6 +499,31 @@ function showBubble(seat, text = '', blitz = false) {
       dismiss.cancel();
     }, () => {});
   }
+}
+
+function hideBlitzCall() {
+  blitzAnimation?.cancel();
+  blitzCall.hidden = true;
+}
+
+function showBlitzCall(player) {
+  const seat = seats[player];
+  const origin = centerOf(seat.element);
+  const center = centerOf(pileGrid);
+  blitzCall.dataset.side = seating[player].side;
+  blitzCall.querySelector('small').textContent = player === 0 ? 'You' : racerName(player);
+  blitzCall.style.left = `${origin.x + (center.x - origin.x) * .66}px`;
+  blitzCall.style.top = `${origin.y + (center.y - origin.y) * .66}px`;
+  blitzCall.hidden = false;
+  const end = centerOf(blitzCall);
+  if (!motion.matches) {
+    blitzAnimation = blitzCall.animate([
+      { opacity: 0, translate: `${origin.x - end.x}px ${origin.y - end.y}px`, scale: .45 },
+      { opacity: 1, translate: '0 0', scale: 1.06, offset: .83 },
+      { opacity: 1, translate: '0 0', scale: 1 },
+    ], { duration: 520, delay: 160, fill: 'backwards', easing: 'cubic-bezier(.18,.75,.25,1)' });
+  }
+  playVoice('blitz', seat.voice, { pan: seatPan[player], delay: motion.matches ? 0 : 250 });
 }
 
 function renderRivals() {
@@ -505,7 +546,11 @@ function renderRivals() {
       const pile = pileGrid.children[bot.focus.pile];
       if (pile) nextWatched.add(pile);
     }
-    showBubble(seat, bot.speech?.text);
+    if (seat.spoken !== bot.speech) {
+      seat.spoken = bot.speech;
+      if (bot.speech) playVoice(bot.speech.line, seat.voice, { pan: seatPan[bot.player] });
+      showBubble(seat, bot.speech?.text);
+    }
   }
   for (const pile of watched) if (!nextWatched.has(pile)) pile.classList.remove('rival-watched');
   for (const pile of nextWatched) if (!watched.has(pile)) pile.classList.add('rival-watched');
@@ -578,6 +623,7 @@ function resumeClock() {
 function startRace() {
   stopClock();
   clearTimeout(finishTimer);
+  hideBlitzCall();
   openDialog()?.close();
   roundNumber = match.completed + 1;
   race = newRace(match.settings.players, Math.random, variants);
@@ -600,6 +646,7 @@ function startRace() {
 function showSetup() {
   stopClock();
   clearTimeout(finishTimer);
+  hideBlitzCall();
   race = null;
   match = null;
   refreshProfiles();
@@ -625,10 +672,11 @@ function finishRace() {
   const result = recordRound(match, roundNumber, race.players.map(score));
   if (!result) return;
   setTableControls(true);
-  seats.forEach((seat, index) => {
+  seats.forEach(seat => {
     seat.looking?.classList.remove('rival-looking');
-    showBubble(seat, index === race.finisher ? 'Blitz!' : '', index === race.finisher);
+    showBubble(seat);
   });
+  showBlitzCall(race.finisher);
   for (const pile of watched) pile.classList.remove('rival-watched');
   watched.clear();
 
@@ -646,7 +694,7 @@ function finishRace() {
   $('#result-progress').hidden = true;
 
   finishTimer = setTimeout(() => {
-    showBubble(seats[race.finisher]);
+    hideBlitzCall();
     openDialog()?.close();
     showTally($('#finish-dialog'), {
       result, racers, cards, face: cardFace, back: cardBack, reducedMotion: motion.matches,
@@ -809,6 +857,9 @@ variantsForm.addEventListener('submit', () => {
   soundsOn = variantsForm.elements.sound.checked;
   saveSetting('sound', soundsOn);
   setSoundEnabled(soundsOn);
+  voicesOn = variantsForm.elements.voices.checked;
+  saveSetting('voices', voicesOn);
+  setVoicesEnabled(voicesOn);
   unlockSounds();
 });
 
@@ -825,7 +876,7 @@ const freePlay = $('#free-play');
 const profileTemplate = $('#profile-template').content.firstElementChild;
 const savedPlayers = previous.players ?? (Number.isInteger(previous.opponents) ? previous.opponents + 1 : 4);
 if ([2, 3, 4].includes(savedPlayers)) setupForm.elements.players.value = String(savedPlayers);
-if (['relaxed', 'quick', 'expert'].includes(previous.difficulty)) setupForm.elements.difficulty.value = previous.difficulty;
+if (['standard', 'quick', 'expert'].includes(previous.difficulty)) setupForm.elements.difficulty.value = previous.difficulty;
 if (Number.isSafeInteger(previous.rounds) && previous.rounds > 0) roundsInput.value = previous.rounds;
 freePlay.checked = previous.rounds === null;
 roundsInput.disabled = freePlay.checked;
@@ -921,6 +972,7 @@ for (const button of [$('#settings'), $('#lobby-settings')]) {
   button.addEventListener('click', () => {
     for (const [key, value] of Object.entries(variants)) variantsForm.elements[key].checked = value;
     variantsForm.elements.sound.checked = soundsOn;
+    variantsForm.elements.voices.checked = voicesOn;
     showDialog($('#settings-dialog'));
   });
 }

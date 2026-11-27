@@ -1,28 +1,39 @@
 import { shuffled } from './engine.js';
 
-const NAMES = `
-Aaron Abel Achim Adam Adrian Agnes Alena Alexander Alexandra Alfred Alina Alma
-Amalia Andreas Angela Anika Anja Annalena Annemarie Annika Anton Antonia Armin
-Artur Astrid August Axel Bastian Beate Benedikt Benjamin Bernd Bianca Birgit
-Björn Bruno Carla Carlotta Carsten Caspar Charlotte Christian Christina Christoph
-Clara Claudia Clemens Cornelia Dagmar Daniela David Dennis Dieter Dominik Doris
-Dorothea Edda Edith Elke Ella Ellen Elli Elsa Emil Emilia Emma Enno Erika Ernst
-Eva Evelin Fabian Falk Felix Ferdinand Finn Florian Frank Franz Franziska Frieda
-Friederike Friedrich Fritz Gabriel Georg Gerd Gerda Greta Gretel Gustav Hanna
-Hannah Hans Heike Heinrich Helene Helga Hendrik Henning Henri Herbert Hermann
-Hilda Holger Ida Ilse Ina Ingrid Irene Iris Isabell Jakob Jan Jana Jannik Jasmin
-Jens Joachim Johann Johanna Johannes Jörg Josef Judith Julia Julian Julius Jürgen
-Kai Karin Karl Katharina Katja Kilian Kirsten Klaus Konrad Kurt Lara Lars Laura
-Lea Lena Lene Leo Leon Leonie Leopold Liesel Lina Lisa Livia Lorenz Lotte
-Lotta Luca Lukas Luise Lydia Malte Manfred Mara Marcel Marco Mareike Maria
-Marianne Marie Marlene Martin Mathilda Matthias Max Maximilian Meike Mia Michael
-Miriam Monika Moritz Nadine Nele Nils Nora Oskar Otto Paula Paul Paulina Peter
-Philipp Pia Rainer Ralf Raphaela Renate Robert Rolf Rosa Ruth Sabine Sandra
-Sebastian Selma Silke Simon Sonja Sophia Sophie Stefan Stefanie Stella Sven
-Svenja Tabea Tanja Theo Thomas Till Timo Tobias Torben Udo Ulf Ulrike Ursula
-Ute Valentin Vera Verena Viktoria Vincent Volker Walter Werner Wilma Wolfgang
-Yvonne Zoe
-`.trim().split(/\s+/u);
+const BY_VOICE = {
+  male: `
+    Aaron Abel Achim Adam Adrian Alexander Alfred Andreas Anton Armin Artur August
+    Axel Bastian Benedikt Benjamin Bernd Björn Bruno Carsten Caspar Christian
+    Christoph Clemens David Dennis Dieter Dominik Emil Enno Ernst Fabian Falk Felix
+    Ferdinand Finn Florian Frank Franz Friedrich Fritz Gabriel Georg Gerd Gustav
+    Hans Heinrich Hendrik Henning Henri Herbert Hermann Holger Jakob Jan Jannik Jens
+    Joachim Johann Johannes Jörg Josef Julian Julius Jürgen Kai Karl Kilian Klaus
+    Konrad Kurt Lars Leo Leon Leopold Lorenz Luca Lukas Malte Manfred Marcel Marco
+    Martin Matthias Max Maximilian Michael Moritz Nils Oskar Otto Paul Peter Philipp
+    Rainer Ralf Robert Rolf Sebastian Simon Stefan Sven Theo Thomas Till Timo Tobias
+    Torben Udo Ulf Valentin Vincent Volker Walter Werner Wolfgang
+  `.trim().split(/\s+/u),
+  female: `
+    Agnes Alena Alexandra Alina Alma Amalia Angela Anika Anja Annalena Annemarie
+    Annika Antonia Astrid Beate Bianca Birgit Carla Carlotta Charlotte Christina
+    Clara Claudia Cornelia Dagmar Daniela Doris Dorothea Edda Edith Elke Ella Ellen
+    Elli Elsa Emilia Emma Erika Eva Evelin Franziska Frieda Friederike Gerda Greta
+    Gretel Hanna Hannah Heike Helene Helga Hilda Ida Ilse Ina Ingrid Irene Iris
+    Isabell Jana Jasmin Johanna Judith Julia Karin Katharina Katja Kirsten Lara
+    Laura Lea Lena Lene Leonie Liesel Lina Lisa Livia Lotte Lotta Luise Lydia Mara
+    Mareike Maria Marianne Marie Marlene Mathilda Meike Mia Miriam Monika Nadine
+    Nele Nora Paula Paulina Pia Raphaela Renate Rosa Ruth Sabine Sandra Selma Silke
+    Sonja Sophia Sophie Stefanie Stella Svenja Tabea Tanja Ulrike Ursula Ute Vera
+    Verena Viktoria Wilma Yvonne Zoe
+  `.trim().split(/\s+/u),
+};
+const voices = new Map(Object.entries(BY_VOICE).flatMap(([voice, names]) =>
+  names.map(name => [name.toLowerCase(), voice])));
+const NAMES = Object.values(BY_VOICE).flat();
+
+export function voiceForName(name) {
+  return voices.get(name.trim().toLowerCase());
+}
 
 export function chooseRivalNames(count, excluded = [], random = Math.random) {
   const used = new Set(excluded.map(name => name.toLowerCase()));
