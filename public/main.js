@@ -4,16 +4,16 @@ import {
 } from './engine.js';
 
 const $ = selector => document.querySelector(selector);
-const pileStrip = $('#piles');
+const pileGrid = $('#piles');
 const newPileButton = $('#new-pile');
 const handButtons = [...document.querySelectorAll('.hand-card')];
 const cardTemplate = $('#card-template').content.firstElementChild;
 const backTemplate = $('#back-template').content.firstElementChild;
-const drawDeck = $('#draw-deck');
+const yourSeat = { deck: $('#draw-deck'), slots: handButtons };
 const rivals = [
-  { name: 'Nova', color: '#b2def6' },
-  { name: 'Sage', color: '#bfe3a2' },
-  { name: 'Dash', color: '#ffc0a4' },
+  { name: 'Nova', side: 'left' },
+  { name: 'Sage', side: 'top' },
+  { name: 'Dash', side: 'bottom' },
 ];
 const pileSymbols = { rise: '↑', match: '=', fall: '↓' };
 const colors = { spark: 'Yellow', tide: 'Blue', ember: 'Red', grove: 'Green' };
@@ -30,6 +30,7 @@ let elapsed = 0;
 let startedAt = null;
 let blockedAt = null;
 let bots = [];
+let rivalSeats = [];
 let message;
 let installPrompt;
 let drag;
@@ -88,42 +89,67 @@ function announce(text, duration = 1500) {
   message = { text, ends: timeNow() + duration };
 }
 
-function carryCard(card, from, to, bot) {
+function carryCard(visual, from, to, { duration = 245, delay = 0 } = {}) {
   if (motion.matches || !from?.width || !to.width) return;
   const flight = document.createElement('div');
   flight.className = 'flight';
   flight.setAttribute('aria-hidden', 'true');
   Object.assign(flight.style, {
-    left: `${from.left + (from.width - to.width) / 2}px`,
-    top: `${from.top + (from.height - to.height) / 2}px`,
-    width: `${to.width}px`, height: `${to.height}px`,
+    left: `${to.left}px`, top: `${to.top}px`,
+    width: `${to.width}px`, height: `${to.height}px`, opacity: '0',
   });
-  flight.append(cardFace(card));
+  flight.append(visual);
   document.body.append(flight);
-  const x = to.left - from.left + (to.width - from.width) / 2;
-  const y = to.top - from.top + (to.height - from.height) / 2;
+  const x = from.left - to.left + (from.width - to.width) / 2;
+  const y = from.top - to.top + (from.height - to.height) / 2;
   const animation = flight.animate([
-    { transform: `translate(0, 0) rotate(${bot ? -10 : 6}deg) scale(${bot ? .42 : from.width / to.width})`, opacity: bot ? .66 : 1 },
-    { transform: `translate(${x}px, ${y}px) rotate(0) scale(1)`, opacity: 1 },
-  ], { duration: bot ? 210 : 240, easing: 'cubic-bezier(.18,.75,.30,1)' });
+    { transform: `translate(${x}px, ${y}px) rotate(${x < 0 ? -8 : 8}deg) scale(${from.width / to.width})`, opacity: .88 },
+    { transform: 'translate(0, 0)', opacity: .98 },
+  ], { duration, delay, easing: 'cubic-bezier(.22,.73,.36,1)' });
   animation.finished.then(() => flight.remove(), () => flight.remove());
 }
 
 function createRivals(opponents) {
-  $('#rivals').replaceChildren(...opponents.map(({ tool }, index) => {
-    const { name, color } = rivals[index];
+  rivalSeats = opponents.map(({ tool, hand }, index) => {
+    const { name, side } = rivals[index];
     const element = document.createElement('div');
-    element.className = 'rival';
-    element.dataset.rival = index + 1;
-    element.style.setProperty('--rival-color', color);
-    element.innerHTML = `<span class="rival-deck" role="img"></span><span><strong class="rival-name">${name}</strong><span class="rival-count"></span></span><span class="rival-track" aria-hidden="true"><span></span></span>`;
-    const deck = element.querySelector('.rival-deck');
-    const label = `${toolNames[tool]} deck`;
-    deck.setAttribute('aria-label', label);
-    deck.title = label;
+    element.className = `rival ${side}`;
+    element.innerHTML = `<div class="seat-heading"><span class="draw-deck" role="img"></span><div><strong class="rival-name">${name}</strong><span class="rival-count"></span></div></div><div class="rival-hand" aria-hidden="true"></div>`;
+    const deck = element.querySelector('.draw-deck');
     deck.append(cardBack(tool));
-    return element;
-  }));
+    const slots = hand.map(() => {
+      const slot = document.createElement('span');
+      slot.className = 'rival-card';
+      slot.append(cardBack(tool));
+      return slot;
+    });
+    element.querySelector('.rival-hand').append(...slots);
+    return { element, deck, slots, remaining: element.querySelector('.rival-count') };
+  });
+  $('#rivals').replaceChildren(...rivalSeats.map(seat => seat.element));
+}
+
+function seatFor(player) {
+  return player === 0 ? yourSeat : rivalSeats[player - 1];
+}
+
+function updateDeck(deck, player, owner) {
+  const count = player.deck.length;
+  const label = `${owner} ${toolNames[player.tool].toLowerCase()} deck, ${count} ${count === 1 ? 'card' : 'cards'} to draw`;
+  deck.setAttribute('aria-label', label);
+  deck.title = label;
+  deck.classList.toggle('stacked', count > 1);
+  deck.classList.toggle('empty', count === 0);
+}
+
+function animateDraw(player, slot, delay = 0) {
+  if (motion.matches || !race.players[player].hand[slot]) return;
+  const { deck, slots } = seatFor(player);
+  const replacement = slots[slot].firstElementChild;
+  const from = deck.firstElementChild.getBoundingClientRect();
+  const duration = 200;
+  carryCard(cardBack(race.players[player].tool), from, replacement.getBoundingClientRect(), { duration, delay });
+  replacement.animate([{ opacity: 0 }, { opacity: 0, offset: .73 }, { opacity: 1 }], { duration, delay, fill: 'backwards' });
 }
 
 function updateTiming() {
@@ -143,46 +169,61 @@ function updateTiming() {
   if ($('#status').textContent !== status) $('#status').textContent = status;
 }
 
-function updatePileNavigation() {
-  $('#pile-prev').disabled = pileStrip.scrollLeft <= 1;
-  $('#pile-next').disabled = pileStrip.scrollLeft + pileStrip.clientWidth >= pileStrip.scrollWidth - 1;
+function fitPiles(count, width, height, gap, labelHeight) {
+  let best;
+  for (let columns = 1; columns <= count; columns++) {
+    const rows = Math.ceil(count / columns);
+    const availableWidth = Math.floor((width - gap * (columns - 1)) / columns);
+    const availableHeight = Math.floor((height - gap * (rows - 1)) / rows);
+    const cardWidth = Math.min(100, availableWidth - 8, Math.floor((availableHeight - labelHeight) * 5 / 7));
+    // Favor larger tap targets when two layouts can fit similarly sized cards.
+    const score = cardWidth + Math.min(44, availableWidth, availableHeight) / 2;
+    if (!best || score > best.score || (score === best.score && rows < best.rows)) {
+      best = { columns, rows, availableWidth, cardWidth, score };
+    }
+  }
+  return best;
 }
 
-function pileIsVisible(button) {
-  const { left, right } = button.getBoundingClientRect();
-  const bounds = pileStrip.getBoundingClientRect();
-  return left >= bounds.left - 1 && right <= bounds.right + 1;
-}
-
-function revealPile(button, animate = false) {
-  if (pileIsVisible(button)) return;
-  const left = pileStrip.scrollLeft + button.getBoundingClientRect().left - pileStrip.getBoundingClientRect().left;
-  pileStrip.scrollTo({ left, behavior: animate && !motion.matches ? 'smooth' : 'auto' });
+function layoutPiles() {
+  const { childElementCount: count, clientWidth: width, clientHeight: height } = pileGrid;
+  if (!count || !width || !height) return;
+  const gap = parseFloat(getComputedStyle(pileGrid).columnGap);
+  const roomy = fitPiles(count, width, height, gap, 36);
+  const compact = roomy.cardWidth < 39 || roomy.availableWidth < 74;
+  const fit = compact ? fitPiles(count, width, height, gap, 18) : roomy;
+  const cardWidth = Math.max(1, fit.cardWidth);
+  const cellWidth = Math.min(fit.availableWidth, Math.max(compact ? 40 : 74, cardWidth + 14));
+  const cellHeight = Math.ceil(cardWidth * 7 / 5) + (compact ? 18 : 36);
+  pileGrid.classList.toggle('compact-piles', compact);
+  pileGrid.style.setProperty('--pile-columns', fit.columns);
+  pileGrid.style.setProperty('--pile-cell-width', `${cellWidth}px`);
+  pileGrid.style.setProperty('--pile-cell-height', `${cellHeight}px`);
 }
 
 function renderPiles(piles, targets) {
-  while (pileStrip.children.length > piles.length) pileStrip.lastElementChild.remove();
+  const countChanged = pileGrid.childElementCount !== piles.length;
+  while (pileGrid.children.length > piles.length) pileGrid.lastElementChild.remove();
   piles.forEach((pile, index) => {
-    let button = pileStrip.children[index];
+    let button = pileGrid.children[index];
     if (!button) {
       button = $('#pile-template').content.firstElementChild.cloneNode(true);
       button.dataset.pile = index;
-      button.querySelector('.pile-order').textContent = index + 1;
-      const kind = document.createElement('span');
-      kind.className = 'pile-symbol';
-      kind.textContent = pileSymbols[pile.rule];
-      button.querySelector('.pile-kind').append(kind, ` ${capitalize(pile.rule)}`);
-      pileStrip.append(button);
+      button.querySelector('.pile-kind').textContent = `${pileSymbols[pile.rule]} ${capitalize(pile.rule)}`;
+      pileGrid.append(button);
     }
-    const instruction = pile.rule === 'match' ? `${colors[pile.top.suit]} only` : `Play a ${nextRank(pile)}`;
+    const matchesColor = pile.rule === 'match';
+    const required = matchesColor ? colors[pile.top.suit] : nextRank(pile);
+    const instruction = matchesColor ? `${required} only` : `Play a ${required}`;
     showCard(button.querySelector('.pile-card'), pile.top);
     button.querySelector('.pile-rule').textContent = instruction;
+    button.querySelector('.pile-cue').textContent = matchesColor ? required : `${pileSymbols[pile.rule]} ${required}`;
     button.classList.toggle('target', targets.includes(index));
     button.setAttribute('aria-label', `${capitalize(pile.rule)} pile ${index + 1}, ${cardName(pile.top)}. ${instruction}`);
   });
   $('#pile-count').textContent = piles.length;
   newPileButton.classList.toggle('target', targets.includes(NEW_PILE));
-  updatePileNavigation();
+  if (countChanged) layoutPiles();
 }
 
 function render() {
@@ -204,22 +245,18 @@ function render() {
   });
 
   $('#remaining').textContent = `${TOTAL - player.played} left`;
-  const drawCount = player.deck.length;
-  const deckLabel = `Your ${toolNames[player.tool].toLowerCase()} deck, ${drawCount} ${drawCount === 1 ? 'card' : 'cards'} to draw`;
-  drawDeck.setAttribute('aria-label', deckLabel);
-  drawDeck.title = deckLabel;
-  drawDeck.classList.toggle('stacked', drawCount > 1);
-  drawDeck.classList.toggle('empty', drawCount === 0);
+  updateDeck(yourSeat.deck, player, 'Your');
   race.players.slice(1).forEach((opponent, index) => {
-    const element = $(`[data-rival="${index + 1}"]`);
-    element.querySelector('.rival-count').textContent = `${TOTAL - opponent.played} left`;
-    element.querySelector('.rival-track span').style.transform = `scaleX(${opponent.played / TOTAL})`;
+    const { deck, slots, remaining } = rivalSeats[index];
+    updateDeck(deck, opponent, `${rivals[index].name}'s`);
+    remaining.textContent = `${TOTAL - opponent.played} left`;
+    slots.forEach((slot, slotIndex) => slot.classList.toggle('vacant', !opponent.hand[slotIndex]));
   });
   updateTiming();
 }
 
 function applyPlay(player, slot, destination, cardId, from) {
-  const source = player ? $(`[data-rival="${player}"]`) : handButtons[slot];
+  const source = seatFor(player).slots[slot].firstElementChild;
   const origin = from ?? source.getBoundingClientRect();
   const opening = destination === NEW_PILE;
   const index = opening ? race.piles.length : destination;
@@ -232,15 +269,27 @@ function applyPlay(player, slot, destination, cardId, from) {
   }
   blockedAt = null;
   render();
-  const target = pileStrip.children[index];
-  if (!player) revealPile(target);
-  if (pileIsVisible(target)) {
-    carryCard(card, origin, target.querySelector('.pile-card').getBoundingClientRect(), player !== 0);
-    playAnimation(target, 'hit');
-  }
-  playAnimation(source, player ? 'is-playing' : 'drawn');
+  const target = pileGrid.children[index];
+  carryCard(cardFace(card), origin, target.querySelector('.card-face').getBoundingClientRect());
+  playAnimation(target, 'hit');
+  animateDraw(player, slot, 70);
   if (race.winner !== null) finishRace();
   return true;
+}
+
+function swapCard(player, slot, now) {
+  const { deck, slots } = seatFor(player);
+  const card = race.players[player].hand[slot];
+  if (!recycle(race, player, slot, now)) return;
+  const from = slots[slot].firstElementChild.getBoundingClientRect();
+  const to = deck.firstElementChild.getBoundingClientRect();
+  carryCard(player === 0 ? cardFace(card) : cardBack(card.tool), from, to, { duration: 180 });
+  if (player === 0) {
+    selected = null;
+    announce(`${cardName(race.players[0].hand[slot])} drawn.`, 800);
+    render();
+  }
+  animateDraw(player, slot, 80);
 }
 
 function tick() {
@@ -253,7 +302,7 @@ function tick() {
       bot.rhythmUntil = now + 2300 + Math.random() * 3900;
     }
     const move = chooseMove(race, bot.player, settings.difficulty);
-    if (move && 'recycle' in move) recycle(race, bot.player, move.recycle, now);
+    if (move && 'recycle' in move) swapCard(bot.player, move.recycle, now);
     else if (move) applyPlay(bot.player, move.slot, move.pile, race.players[bot.player].hand[move.slot].id);
     bot.next = now + reactionTime(bot.player, settings.difficulty, bot.rhythm);
     if (race.winner !== null) return;
@@ -266,7 +315,7 @@ function tick() {
       blockedAt = null;
       announce('Piles reset. Look for a new match!');
       render();
-      for (const button of pileStrip.children) if (pileIsVisible(button)) playAnimation(button, 'hit');
+      for (const button of pileGrid.children) playAnimation(button, 'hit');
     }
   }
   updateTiming();
@@ -299,11 +348,12 @@ function startRace() {
   }));
   $('.lobby').hidden = true;
   $('#arena').hidden = false;
-  drawDeck.replaceChildren(cardBack(race.players[0].tool));
+  $('#pause').hidden = false;
+  yourSeat.deck.replaceChildren(cardBack(race.players[0].tool));
   createRivals(race.players.slice(1));
   render();
-  pileStrip.scrollLeft = 0;
-  updatePileNavigation();
+  layoutPiles();
+  race.players.forEach(({ hand }, player) => hand.forEach((_, slot) => animateDraw(player, slot, slot * 55)));
   resumeClock();
 }
 
@@ -313,6 +363,7 @@ function showSetup() {
   race = null;
   openDialog()?.close();
   $('#arena').hidden = true;
+  $('#pause').hidden = true;
   $('.lobby').hidden = false;
   $('.start').focus();
 }
@@ -360,8 +411,6 @@ function selectCard(slot) {
   if (options.length === 1) return playFromHand(slot, options[0]);
   selected = selected === slot ? null : slot;
   render();
-  const matches = options.filter(index => index !== NEW_PILE).map(index => pileStrip.children[index]);
-  if (selected !== null && matches.length && !matches.some(pileIsVisible)) revealPile(matches[0], true);
 }
 
 function cancelDrag() {
@@ -439,23 +488,12 @@ $('.table').addEventListener('click', event => {
   }
 });
 
-pileStrip.addEventListener('scroll', updatePileNavigation, { passive: true });
-window.addEventListener('resize', updatePileNavigation);
-[['#pile-prev', -1], ['#pile-next', 1]].forEach(([selector, direction]) => {
-  $(selector).addEventListener('click', () => {
-    pileStrip.scrollBy({ left: direction * pileStrip.clientWidth, behavior: motion.matches ? 'auto' : 'smooth' });
-  });
-});
+new ResizeObserver(layoutPiles).observe(pileGrid);
 
 $('#cycle').addEventListener('click', () => {
   if (!canPlay()) return;
   const player = race.players[0];
-  const slot = selected ?? recycleSlot(player.hand, race.piles);
-  if (!recycle(race, 0, slot, timeNow())) return;
-  selected = null;
-  announce(`${cardName(player.hand[slot])} drawn.`, 800);
-  render();
-  playAnimation(handButtons[slot], 'drawn');
+  swapCard(0, selected ?? recycleSlot(player.hand, race.piles), timeNow());
 });
 
 function showDialog(dialog) {
